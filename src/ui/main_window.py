@@ -1,5 +1,6 @@
 import time
 import tkinter as tk
+import webbrowser
 from tkinter import scrolledtext
 import threading
 import datetime
@@ -38,7 +39,7 @@ class AutoWallsUI:
         self.hwnd = hwnd
         self.rois = rois
 
-        self.root.title("AutoWalls · Tri-Engine OCR")
+        self.root.title("AutoWalls · Engine by N1xUser")
         self.root.geometry(f"{WINDOW_W}x{WINDOW_H}")
         self.root.configure(bg=BG_DEEP)
         self.root.resizable(True, True)
@@ -509,8 +510,13 @@ class AutoWallsUI:
                  bg=BG_DEEP, fg=FG_PRIMARY).pack(side="left")
         tk.Label(logo, text="WALLS", font=("Courier", 15, "bold"),
                  bg=BG_DEEP, fg=ACCENT_GOLD).pack(side="left")
-        tk.Label(logo, text="  ·  Tri-Engine OCR", font=("Courier", 9),
-                 bg=BG_DEEP, fg=FG_DIM).pack(side="left")
+        tk.Label(logo, text="  ·  https://github.com/N1xUser", font=("Courier", 9),
+                 bg=BG_DEEP, fg=FG_DIM, cursor="hand2").pack(side="left")
+        
+        # Link the label to GitHub
+        for slave in logo.pack_slaves():
+            if slave.cget("text") == "  ·  Tri-Engine OCR by N1xUser":
+                slave.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/N1xUser"))
 
         right = tk.Frame(top, bg=BG_DEEP)
         right.pack(side="right")

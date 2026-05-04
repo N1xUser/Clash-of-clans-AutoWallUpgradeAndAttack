@@ -3,3 +3,7 @@ pywin32
 numpy
 pytesseract
 google-genai
+Pillow
+rapidocr-onnxruntime
+pydantic
+requests

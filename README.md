@@ -1,12 +1,9 @@
-Here is the content converted into clean, GitHub-flavored Markdown.
-
-***
-
 # AutoWall – Clash of Clans Automation System
 
-AutoWall is a sophisticated automation framework for Clash of Clans that leverages computer vision, multi‑engine optical character recognition, and generative AI to perform unattended resource farming, base upgrading, and attack deployment. It interacts with the game entirely through simulated window messages, never moving the physical mouse or requiring the game to be in the foreground.
+AutoWall is a helper framework for Clash of Clans that uses computer vision, multi‑engine optical character recognition, and generative AI to perform unattended resource farming, base upgrading, and attack deployment. It interacts with the game entirely through simulated window messages, never moving the physical mouse or requiring the game to be in the foreground.
 
 ## How It Works
+
 
 The bot captures the Clash of Clans window using the Win32 API (`PrintWindow` with `PW_RENDERFULLCONTENT`), reads the current screen state, and sends mouse clicks and scrolls via `PostMessage`. All logic runs in a Python loop that cycles through:
 
@@ -20,21 +17,25 @@ The bot captures the Clash of Clans window using the Win32 API (`PrintWindow` wi
 
 Everything is configurable from a Tkinter dashboard, which also provides real‑time resource displays, terminal logs, and live OCR previews.
 
+
+<img width="1136" height="731" alt="Captura de pantalla 2026-05-03 225818" src="https://github.com/user-attachments/assets/f0338862-7dc6-4566-89b6-68ae13d1d869" />
+
+
 ## Core Modules
 
 ### Window Capture (`src/vision/capture.py`)
 
 The capture module finds the CoC window by searching for a window title containing “Clash of Clans” (excluding browser windows). Once identified it obtains the window DC, creates a compatible bitmap, and uses `PrintWindow` to blit the entire window content (including areas that might be off‑screen or behind overlays) into a NumPy array. The frame is then cropped to the client area, with a configurable header offset to ignore the title bar. All rendering is done without activating the window.
 
-Clicks and scrolls are performed relative to the client area: the code translates ROI coordinates (0‑1 relative to the capture size) to screen coordinates, converts them to client coordinates for the target window (and any child windows), and posts `WM_LBUTTONDOWN` / `WM_LBUTTONUP` or `WM_MOUSEWHEEL` messages.
+Clicks and scrolls are performed relative to the client area:	the code translates ROI coordinates (0‑1 relative to the capture size) to screen coordinates, converts them to client coordinates for the target window (and any child windows), and posts `WM_LBUTTONDOWN` / `WM_LBUTTONUP` or `WM_MOUSEWHEEL` messages.
 
 ### Computer Vision & Preprocessing (`src/vision/detection.py`)
 
 Before OCR is invoked, the relevant ROI is extracted and colour‑filtered to isolate the text. Each resource type has its own HSV/BGR range mask, carefully tuned for the exact pixel colours used in the game. For example:
 
-* **Home Gold** numbers use a white tone (approx. #E0E0E0) with a tolerance of 23.
-* **Enemy Gold** uses two close colour variants that both match the gold resource bar.
-* **Enemy Elixir** similarly uses two ranges to capture slightly different shades.
+*   **Home Gold** numbers use a white tone (approx. #E0E0E0) with a tolerance of 23.
+*   **Enemy Gold** uses two close colour variants that both match the gold resource bar.
+*   **Enemy Elixir** similarly uses two ranges to capture slightly different shades.
 
 The Upgrades menu uses a combination of a white mask, a red mask (for the cost text), and a green mask (for “available” indicators), all combined and then inverted so that text becomes white on a black background. Finally, a morphological open operation removes small noise.
 
@@ -46,9 +47,9 @@ All these functions work on regions defined during the calibration step.
 
 Three OCR engines are available, selected independently for home resources, enemy resources, upgrades menu, wall upgrade text, and builder status.
 
-* **Tesseract** – classic local engine; used with `--psm 6` for multi‑line upgrades and `--psm 7` for builder fractions. Resource numbers are extracted using `extract_all_tesseract`: crops are padded to equal width, vertically stacked, and the combined image is processed with a numeric whitelist. This drastically improves throughput compared to per‑crop calls.
-* **RapidOCR** – ONNX‑runtime based OCR (via `rapidocr-onnxruntime`); provides line‑level results and is extremely fast. The multi‑crop method works similarly by concatenating lines.
-* **GLM (Ollama)** – uses a local Ollama instance serving a vision model (e.g., `maternion/LightOnOCR-2`) to perform OCR. Images are base64‑encoded and sent to the API. For resource numbers, all crops are vertically stacked and a single prompt asks for all numbers separated by semicolons. For the upgrades menu, the raw text of each page is sent for parsing.
+*   **Tesseract** – classic local engine; used with `--psm 6` for multi‑line upgrades and `--psm 7` for builder fractions. Resource numbers are extracted using `extract_all_tesseract`: crops are padded to equal width, vertically stacked, and the combined image is processed with a numeric whitelist. This drastically improves throughput compared to per‑crop calls.
+*   **RapidOCR** – ONNX‑runtime based OCR (via `rapidocr-onnxruntime`); provides line‑level results and is extremely fast. The multi‑crop method works similarly by concatenating lines.
+*   **GLM (Ollama)** – uses a local Ollama instance serving a vision model (e.g., `maternion/LightOnOCR-2`) to perform OCR. Images are base64‑encoded and sent to the API. For resource numbers, all crops are vertically stacked and a single prompt asks for all numbers separated by semicolons. For the upgrades menu, the raw text of each page is sent for parsing.
 
 The parsed upgrades text is processed by `parse_raw_upgrades_text`, which attempts to handle HTML tables, Markdown tables, or plain text. It extracts the building name, quantity (if an “x3” suffix is present), cost, and maps the resource using a dictionary (`dic.json`). Unknown resources are marked as “n/d”.
 
@@ -58,6 +59,9 @@ A full GUI‑based calibration tool runs when no ROIs file is found (or when for
 
 The calibration includes descriptions tailored to each region, and the process can be stepped forward or backward. Pressing Escape cancels and exits; the spacebar locks the current ROI and advances.
 
+
+<img width="647" height="612" alt="Captura de pantalla 2026-05-03 230037" src="https://github.com/user-attachments/assets/2dd444a9-091c-481d-be22-e22884683ecd" />
+
 ### State Management & Caching (`src/core/state_manager.py`, `src/core/builder.py`)
 
 The bot maintains an in‑memory dictionary (`latest_data`) holding all current resource values, builder fraction, and upgrades information. This is continuously updated by scans. The `BuilderScanner` encapsulates the “open builder menu, scroll through all pages, aggregate unique upgrades” logic. It uses a deduplication key (`name + cost`) and stops after two consecutive pages yield no new items. The full raw text of all pages is preserved for debugging.
@@ -66,14 +70,14 @@ The bot maintains an in‑memory dictionary (`latest_data`) holding all current 
 
 Attacks follow a battle plan that can be sourced from:
 
-* **Static JSON** (`config/static_attack.json`) – a pre‑defined list of deployment actions, possibly with advanced deployment modes.
-* **Dynamic AI** – a screenshot of the enemy base is sent to Google Gemini AI (via the `google-genai` library) with a strict Pydantic schema. The AI returns bounding boxes for air defences and troops, plus an optimal deployment plan. The code then translates bounding boxes to screen coordinates and queues the actions.
+*   **Static JSON** (`config/static_attack.json`) – a pre‑defined list of deployment actions, possibly with advanced deployment modes.
+*   **Dynamic AI** – a screenshot of the enemy base is sent to Google Gemini AI (via the `google-genai` library) with a strict Pydantic schema. The AI returns bounding boxes for air defences and troops, plus an optimal deployment plan. The code then translates bounding boxes to screen coordinates and queues the actions.
 
 Deployment is executed as an action queue that interleaves troop selection and map drops. Three deployment algorithms are implemented:
 
-* `"human"` – Deploys each troop type sequentially along a red‑line perimeter (four linear segments). Troops are spaced evenly along the line; the bot selects the troop card once, then drops all units of that type before moving to the next.
-* `"random"` – Randomly picks a troop type and drops up to 3 units at a random point on the red line before possibly switching troop type.
-* `"robot"` – Creates an interleaved sequence where troop indices are cycled (troop1, troop2, troop3, …) and the drops are distributed equally across the four map segments. The troop card is only re‑clicked when the troop type changes, minimising redundant selections.
+*   `"human"` – Deploys each troop type sequentially along a red‑line perimeter (four linear segments). Troops are spaced evenly along the line; the bot selects the troop card once, then drops all units of that type before moving to the next.
+*   `"random"` – Randomly picks a troop type and drops up to 3 units at a random point on the red line before possibly switching troop type.
+*   `"robot"` – Creates an interleaved sequence where troop indices are cycled (troop1, troop2, troop3, …) and the drops are distributed equally across the four map segments. The troop card is only re‑clicked when the troop type changes, minimising redundant selections.
 
 Spells and heroes are deployed after troops. The bot waits for heroes to land (configurable `HERO_DELAY_BEFORE_ABILITY`), then cycles back to activate their abilities.
 
@@ -103,47 +107,57 @@ The pipeline includes a 30‑minute cache for upgrades, meaning the builder menu
 
 The UI is built with Tkinter and features:
 
-* Custom‑styled cards for live resource display (with sparklines for recent values).
-* A scrollable body layout with three columns: Home Resources, Enemy Loot & AI Integration, Pipeline Configuration.
-* Clickable scan buttons per OCR engine, plus separate buttons for upgrades.
-* Checkboxes for Auto Wall Upgrade, Auto Donate, Anti‑AFK, and Debug Screenshots.
-* A terminal log with colour‑coded messages (system, bot, gold, elixir, etc.).
-* A “Preview” mode that opens a live OpenCV window showing the preprocessed OCR crops.
-* A “Debug JSON” window to load and test static attack plans.
+*   Custom‑styled cards for live resource display (with sparklines for recent values).
+*   A scrollable body layout with three columns: Home Resources, Enemy Loot & AI Integration, Pipeline Configuration.
+*   Clickable scan buttons per OCR engine, plus separate buttons for upgrades.
+*   Checkboxes for Auto Wall Upgrade, Auto Donate, Anti‑AFK, and Debug Screenshots.
+*   A terminal log with colour‑coded messages (system, bot, gold, elixir, etc.).
+*   A “Preview” mode that opens a live OpenCV window showing the preprocessed OCR crops.
+*   A “Debug JSON” window to load and test static attack plans.
 
 The Anti‑AFK system, when enabled, periodically zooms the camera in/out and pans the view to prevent the game from going idle.
+
+<img width="1754" height="974" alt="Captura de pantalla 2026-05-03 225936" src="https://github.com/user-attachments/assets/53a2879b-021c-471a-925b-b01722fb5a2e" />
 
 ## Installation
 
 ### Requirements
 
-* Windows 10/11
-* Python 3.8 or later
-* Clash of Clans running on any platform (native Windows Store version is the primary target, but emulators may work after calibration)
-* Tesseract OCR (optional, only if you want the Tesseract engine). Download from [GitHub](https://github.com/tesseract-ocr/tesseract) and ensure it is in your PATH.
-* Ollama (optional, for GLM OCR). Download from [ollama.ai](https://ollama.ai) and pull a vision model, e.g. `ollama pull maternion/LightOnOCR-2`. Update `OLLAMA_MODEL` in `ocr.py` to match.
-* Google Gemini API key (optional, for Dynamic AI mode)
+*   Windows 10/11
+*   Python 3.8 or later
+*   Clash of Clans running on any platform (native Windows Store version is the primary target, but emulators may work after calibration)
+*   Tesseract OCR (optional, only if you want the Tesseract engine). Download from [GitHub](https://github.com/tesseract-ocr/tesseract) and ensure it is in your PATH.
+*   Ollama (optional, for GLM OCR). Download from [ollama.ai](https://ollama.ai) and pull a vision model, e.g. `ollama pull maternion/LightOnOCR-2`. Update `OLLAMA_MODEL` in `ocr.py` to match.
+*   Google Gemini API key (optional, for Dynamic AI mode)
 
 ### Setup Steps
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/yourusername/AutoWallsUpgrade.git
    cd AutoWallsUpgrade
    ```
+
 2. Create a virtual environment and activate it:
+
    ```bash
    python -m venv .venv
    .venv\Scripts\activate
    ```
+
 3. Install dependencies:
+
    ```bash
    pip install -r requirements.txt
    ```
+
 4. (Optional) Install RapidOCR for the fastest local engine:
+
    ```bash
    pip install rapidocr-onnxruntime
    ```
+
 5. Copy your Gemini API key into a `.env` file or directly into the UI later.
 
 ## Running the Bot
@@ -170,11 +184,11 @@ python main.py
 
 Configure the pipeline:
 
-* **Home Pipeline** → Select the OCR engine for resources and for upgrades.
-* **Attack Config** → Select the OCR engine for enemy loot and for wall OCR during upgrades.
-* **Min Targets** → Set minimum gold, elixir, gold+elixir, or dark elixir. Use the checkbox state (✓ = AND, • = OR) to combine conditions.
-* **AI Integration** → Choose “STATIC” to use `config/static_attack.json` or “DYNAMIC AI” to use Gemini. Enter your API key.
-* **Attack Settings** → Enable **AUTO WALLS**, **ANTI AFK**, and **SAVE DEBUG SCREENSHOTS** as needed.
+*   **Home Pipeline** → Select the OCR engine for resources and for upgrades.
+*   **Attack Config** → Select the OCR engine for enemy loot and for wall OCR during upgrades.
+*   **Min Targets** → Set minimum gold, elixir, gold+elixir, or dark elixir. Use the checkbox state (✓ = AND, • = OR) to combine conditions.
+*   **AI Integration** → Choose “STATIC” to use `config/static_attack.json` or “DYNAMIC AI” to use Gemini. Enter your API key.
+*   **Attack Settings** → Enable **AUTO WALLS**, **ANTI AFK**, and **SAVE DEBUG SCREENSHOTS** as needed.
 
 Press the green **START BOT** button to begin the automation loop.
 
@@ -236,15 +250,15 @@ Increase these if your system has noticeable latency; lower them if the emulator
 
 ## Troubleshooting
 
-* **“CoC window not found”** – Make sure the game window title contains “Clash of Clans”. Exclude browser windows (the code already filters Firefox, Chrome, Edge). Try restarting the game.
-* **OCR returns wrong values** – Recalibrate the ROIs, or try a different engine (RapidOCR is generally the most accurate for numbers). Ensure the game is not in a scaled or blurred state.
-* **Clicks not registering** – The bot uses `PostMessage`; some emulators may ignore those messages. Make sure the emulator’s window is not minimised and that no other program is capturing input. You can test by manually sending clicks using a tool like Spy++.
-* **Bot gets stuck in a loop** – Check the terminal log for exceptions. The most common cause is a reload popup that was not handled. Ensure `PW_RENDERFULLCONTENT` is set to `2` (which is default).
-* **Dynamic AI fails** – Verify your Gemini API key and internet connection. The model used is selected in the UI; try the latest “gemini-3.1-flash-lite-preview”.
+*   **“CoC window not found”** – Make sure the game window title contains “Clash of Clans”. Exclude browser windows (the code already filters Firefox, Chrome, Edge). Try restarting the game.
+*   **OCR returns wrong values** – Recalibrate the ROIs, or try a different engine (RapidOCR is generally the most accurate for numbers). Ensure the game is not in a scaled or blurred state.
+*   **Clicks not registering** – The bot uses `PostMessage`; some emulators may ignore those messages. Make sure the emulator’s window is not minimised and that no other program is capturing input. You can test by manually sending clicks using a tool like Spy++.
+*   **Bot gets stuck in a loop** – Check the terminal log for exceptions. The most common cause is a reload popup that was not handled. Ensure `PW_RENDERFULLCONTENT` is set to `2` (which is default).
+*   **Dynamic AI fails** – Verify your Gemini API key and internet connection. The model used is selected in the UI; try the latest “gemini-3.1-flash-lite-preview”.
 
 ## Project Architecture
 
-```text
+```
 AutoWallsUpgrade/
 ├── src/
 │   ├── ui/                # Tkinter UI components
@@ -260,3 +274,4 @@ AutoWallsUpgrade/
 ## Notes
 
 This project is strictly for educational and research purposes. Using automation software may violate the game’s Terms of Service. The developers assume no liability for account actions taken by users.
+

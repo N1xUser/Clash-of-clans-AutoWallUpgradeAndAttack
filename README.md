@@ -1,3 +1,4 @@
+<img width="829" height="661" alt="Captura de pantalla 2026-05-03 230230" src="https://github.com/user-attachments/assets/c6ace127-cb90-496d-a951-77cfb46817b3" />
 # AutoWall – Clash of Clans Automation System
 
 AutoWall is a helper framework for Clash of Clans that uses computer vision, multi‑engine optical character recognition, and generative AI to perform unattended resource farming, base upgrading, and attack deployment. It interacts with the game entirely through simulated window messages, never moving the physical mouse or requiring the game to be in the foreground.
@@ -16,7 +17,6 @@ The bot captures the Clash of Clans window using the Win32 API (`PrintWindow` wi
 7. Repeating the entire loop
 
 Everything is configurable from a Tkinter dashboard, which also provides real‑time resource displays, terminal logs, and live OCR previews.
-
 
 <img width="1136" height="731" alt="Captura de pantalla 2026-05-03 225818" src="https://github.com/user-attachments/assets/f0338862-7dc6-4566-89b6-68ae13d1d869" />
 
@@ -39,6 +39,8 @@ Before OCR is invoked, the relevant ROI is extracted and colour‑filtered to is
 
 The Upgrades menu uses a combination of a white mask, a red mask (for the cost text), and a green mask (for “available” indicators), all combined and then inverted so that text becomes white on a black background. Finally, a morphological open operation removes small noise.
 
+![Uploading Captura de pantalla 2026-05-03 230230.png…]()
+
 The `is_main_screen` checker looks for the blue “i” button by counting non‑white pixels in the inverted mask. `check_match_found` looks for the bright cyan “Next” button after a battle search.
 
 All these functions work on regions defined during the calibration step.
@@ -58,7 +60,6 @@ The parsed upgrades text is processed by `parse_raw_upgrades_text`, which attemp
 A full GUI‑based calibration tool runs when no ROIs file is found (or when forced with `python main.py calibrate`). It displays the live game frame, dims the area outside the selection, and provides sliders to adjust the bounding box for each required region. A real‑time OCR preview shows how the preprocessed image will look. Regions are saved to `config/rois.json` as relative coordinates (0‑1).
 
 The calibration includes descriptions tailored to each region, and the process can be stepped forward or backward. Pressing Escape cancels and exits; the spacebar locks the current ROI and advances.
-
 
 <img width="647" height="612" alt="Captura de pantalla 2026-05-03 230037" src="https://github.com/user-attachments/assets/2dd444a9-091c-481d-be22-e22884683ecd" />
 
@@ -97,6 +98,8 @@ The wall upgrade manager is triggered after a successful attack. It:
 
 A “deselector sequence” is used before each wall type to ensure the builder menu is in a known state: zoom out, click the builder icon, scroll the menu, and click a corner to close any previous selection. Wall selection is verified by checking for a white pixel at a known coordinate (the cost text colour is #E0E0E0, threshold 210‑255).
 
+<img width="1261" height="538" alt="Captura de pantalla 2026-05-03 230456" src="https://github.com/user-attachments/assets/5cec29eb-643c-44bf-8ab4-50bdf8854390" />
+
 ### Bot Pipeline (`src/core/bot.py`)
 
 The orchestrator runs the main loop in a separate thread. It constantly checks whether the bot is still running and catches `ReloadGameException` to restart the cycle. The `_safe_capture` function monitors for the “Reload Game” popup (checking pixel colours at two screen coordinates) and handles it by clicking “Reload” and waiting for the main village to reappear, then raising the exception to restart the loop.
@@ -127,7 +130,7 @@ The Anti‑AFK system, when enabled, periodically zooms the camera in/out and pa
 *   Python 3.8 or later
 *   Clash of Clans running on any platform (native Windows Store version is the primary target, but emulators may work after calibration)
 *   Tesseract OCR (optional, only if you want the Tesseract engine). Download from [GitHub](https://github.com/tesseract-ocr/tesseract) and ensure it is in your PATH.
-*   Ollama (optional, for GLM OCR). Download from [ollama.ai](https://ollama.ai) and pull a vision model, e.g. `ollama pull maternion/LightOnOCR-2`. Update `OLLAMA_MODEL` in `ocr.py` to match.
+*   Ollama (For OCR). Download from [ollama.ai](https://ollama.ai) and pull a vision model, e.g. `ollama pull maternion/LightOnOCR-2`. Update `OLLAMA_MODEL` in `ocr.py` to match.
 *   Google Gemini API key (optional, for Dynamic AI mode)
 
 ### Setup Steps

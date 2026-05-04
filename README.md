@@ -1,4 +1,3 @@
-<img width="829" height="661" alt="Captura de pantalla 2026-05-03 230230" src="https://github.com/user-attachments/assets/c6ace127-cb90-496d-a951-77cfb46817b3" />
 # AutoWall – Clash of Clans Automation System
 
 AutoWall is a helper framework for Clash of Clans that uses computer vision, multi‑engine optical character recognition, and generative AI to perform unattended resource farming, base upgrading, and attack deployment. It interacts with the game entirely through simulated window messages, never moving the physical mouse or requiring the game to be in the foreground.
@@ -172,6 +171,7 @@ On first launch, the bot will automatically enter calibration mode because no `c
 ```bash
 python main.py calibrate
 ```
+<img width="829" height="661" alt="Captura de pantalla 2026-05-03 230230" src="https://github.com/user-attachments/assets/c6ace127-cb90-496d-a951-77cfb46817b3" />
 
 Follow the on‑screen instructions to draw a box around each required region. The preview panel shows the processed image; adjust the sliders until the text is clearly visible. Press SPACE to confirm each step, B to go back, or ESC to quit.
 

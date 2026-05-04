@@ -1,0 +1,59 @@
+{
+  "available_troops": [
+    {
+      "name": "White Dragon",
+      "x": 0.17,
+      "y": 0.9,
+      "quantity": 20
+    },
+    {
+      "name": "Electric Dragon",
+      "x": 0.23,
+      "y": 0.9,
+      "quantity": 20
+    },
+    {
+      "name": "Log Launcher",
+      "x": 0.3,
+      "y": 0.9,
+      "quantity": 1
+    }
+  ],
+  "available_spells": [
+    {
+      "name": "Lightning Spell 1",
+      "x": 0.63,
+      "y": 0.9,
+      "quantity": 11
+    },
+    {
+      "name": "Lightning Spell 2",
+      "x": 0.71,
+      "y": 0.9,
+      "quantity": 3
+    }
+  ],
+  "available_heros": [
+    {
+      "name": "Royal Champion",
+      "x": 0.37,
+      "y": 0.9
+    },
+    {
+      "name": "Barbarian King",
+      "x": 0.43,
+      "y": 0.9
+    },
+    {
+      "name": "Grand Warden",
+      "x": 0.5,
+      "y": 0.9
+    },
+    {
+      "name": "Archer King",
+      "x": 0.57,
+      "y": 0.9
+    }
+  ],
+  "deployment_mode": "robot"
+}

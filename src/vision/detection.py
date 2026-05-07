@@ -67,9 +67,16 @@ def preprocess_for_ocr(img, resource_name):
 
     else:
         target_tol = 23
-        lower = np.array([max(0, 224-target_tol), max(0, 224-target_tol), max(0, 224-target_tol)])
-        upper = np.array([min(255, 224+target_tol), min(255, 224+target_tol), min(255, 224+target_tol)])
-        mask = cv2.inRange(img, lower, upper)
+        lower1 = np.array([max(0, 224-target_tol), max(0, 224-target_tol), max(0, 224-target_tol)])
+        upper1 = np.array([min(255, 224+target_tol), min(255, 224+target_tol), min(255, 224+target_tol)])
+        mask1 = cv2.inRange(img, lower1, upper1)
+        
+        white_tol = 10
+        lower2 = np.array([max(0, 255-white_tol), max(0, 255-white_tol), max(0, 255-white_tol)])
+        upper2 = np.array([255, 255, 255])
+        mask2 = cv2.inRange(img, lower2, upper2)
+        
+        mask = cv2.bitwise_or(mask1, mask2)
 
     kernel = np.ones((2,2), np.uint8)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)

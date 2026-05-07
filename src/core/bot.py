@@ -124,9 +124,22 @@ class BotOrchestrator:
                     while self.bot_running and time.time() < load_timeout:
                         time.sleep(1.0)
                         check_frame = self._safe_capture()
-                        if check_frame is not None and is_main_screen(check_frame, self.rois["main_screen_i"]):
-                            self.ui_callbacks["log_terminal"]("[BOT] Main village detected!", "bot")
-                            return True
+                        if check_frame is not None:
+                            # Check for Star Bonus popup (#FFFFCC -> BGR: 204, 255, 255) at x=0.659, y=0.120
+                            h, w = check_frame.shape[:2]
+                            px, py = int(0.659 * w), int(0.120 * h)
+                            color = check_frame[py, px]
+                            target_color = np.array([204, 255, 255])
+                            
+                            if np.all(np.abs(color.astype(int) - target_color.astype(int)) <= 15):
+                                self.ui_callbacks["log_terminal"]("[BOT] Star Bonus popup detected! Clicking Okay...", "bot")
+                                click_relative_roi(self.hwnd, {"x": 0.50, "y": 0.83, "w": 0, "h": 0})
+                                time.sleep(2.0)
+                                continue
+
+                            if is_main_screen(check_frame, self.rois["main_screen_i"]):
+                                self.ui_callbacks["log_terminal"]("[BOT] Main village detected!", "bot")
+                                return True
                             
                     self.ui_callbacks["log_terminal"]("[WARN] Timed out waiting for Home Village to load.", "sys")
                     return False
@@ -137,6 +150,7 @@ class BotOrchestrator:
         return False
         
     def _pipeline_worker(self):
+        attack_count = 0
         while self.bot_running:
             try:
                 self.ui_callbacks["log_terminal"]("[BOT] Step 1: Retrieving Home Resources...", "bot")
@@ -144,6 +158,20 @@ class BotOrchestrator:
                 
                 if not self.bot_running:
                     break
+                
+                # Safety: verify we're on main screen before continuing
+                check_frame = self._safe_capture()
+                if check_frame is not None and not is_main_screen(check_frame, self.rois["main_screen_i"]):
+                    self.ui_callbacks["log_terminal"]("[WARN] Not on main screen. Attempting recovery...", "sys")
+                    click_relative_roi(self.hwnd, {"x": 0.95, "y": 0.05, "w": 0, "h": 0})
+                    time.sleep(1.0)
+                    click_relative_roi(self.hwnd, {"x": 0.95, "y": 0.05, "w": 0, "h": 0})
+                    time.sleep(1.5)
+                    recheck = self._safe_capture()
+                    if recheck is None or not is_main_screen(recheck, self.rois["main_screen_i"]):
+                        self.ui_callbacks["log_terminal"]("[WARN] Still not on main screen. Restarting cycle...", "sys")
+                        time.sleep(2.0)
+                        continue
                 
                 time.sleep(1.0)
 
@@ -208,9 +236,17 @@ class BotOrchestrator:
                 
                 self.ui_callbacks["log_terminal"]("[BOT] Searching for match...", "bot")
                 next_btn_roi = {"x": 0.80, "y": 0.75, "w": 0.15, "h": 0.15}
+                restart_cycle = False
 
                 while self.bot_running:
                     frame = self._safe_capture()
+                    
+                    # Safety: if we got kicked back to main screen, restart cycle
+                    if frame is not None and is_main_screen(frame, self.rois["main_screen_i"]):
+                        self.ui_callbacks["log_terminal"]("[WARN] Main screen detected during search! Restarting cycle...", "bot_off")
+                        restart_cycle = True
+                        break
+                    
                     if frame is not None and check_match_found(frame, next_btn_roi):
                         self.ui_callbacks["log_terminal"]("[BOT] Match Found! Validating criteria...", "bot")
                         
@@ -254,6 +290,9 @@ class BotOrchestrator:
                             time.sleep(3.5)
                     else:
                         time.sleep(0.5)
+                
+                if restart_cycle:
+                    continue
 
                 if self.bot_running:
                     self.ui_callbacks["log_terminal"]("[BOT] System Ready. Awaiting Battle Loop deployment logic implementation.", "sys")
@@ -291,18 +330,23 @@ class BotOrchestrator:
                     if not self.bot_running:
                         break
 
+                    attack_count += 1
+
                     if self.upgrade_manager.is_auto_wall_enabled():
-                        self.ui_callbacks["log_terminal"]("[BOT] Post-Match: Evaluating Wall Upgrades...", "bot")
-                        
-                        self.state_manager.scan_home_resources()
-                        
-                        walls_to_do = self.state_manager.get_wall_upgrades()
-                        
-                        if walls_to_do:
-                            # >> CHANGED HERE: Using proper UpgradeManager API
-                            self.upgrade_manager.upgrade_walls(walls_to_do, self._safe_capture)
+                        wall_freq = self.ui_callbacks.get("get_wall_check_freq", lambda: 1)()
+                        if attack_count % wall_freq == 0:
+                            self.ui_callbacks["log_terminal"](f"[BOT] Post-Match ({attack_count}/{wall_freq}): Evaluating Wall Upgrades...", "bot")
+                            
+                            self.state_manager.scan_home_resources()
+                            
+                            walls_to_do = self.state_manager.get_wall_upgrades()
+                            
+                            if walls_to_do:
+                                self.upgrade_manager.upgrade_walls(walls_to_do, self._safe_capture)
+                            else:
+                                self.ui_callbacks["log_terminal"]("[BOT] No walls found in Upgrades cache. Skipping.", "sys")
                         else:
-                            self.ui_callbacks["log_terminal"]("[BOT] No walls found in Upgrades cache. Skipping.", "sys")
+                            self.ui_callbacks["log_terminal"](f"[BOT] Wall check skipped ({attack_count}/{wall_freq}). Next check in {wall_freq - (attack_count % wall_freq)} attacks.", "sys")
                     else:
                         self.ui_callbacks["log_terminal"]("[BOT] Auto Wall Upgrade is disabled. Skipping.", "sys")
                         

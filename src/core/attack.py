@@ -276,7 +276,7 @@ class AttackManager:
         # ----------------------------------------------------
         # 3. HEROES CALCULATION
         # ----------------------------------------------------
-        hero_drops =[]
+        hero_drops = []
         if heroes_list:
             for i, hero in enumerate(heroes_list):
                 h_name = hero.get("name", "Unknown")
@@ -289,11 +289,19 @@ class AttackManager:
                 
                 action_queue.append(("drop", dx, dy, self.HERO_DELAY_AFTER_DROP, h_name))
                 tracked_drops.append((dx, dy, h_name))
-                hero_drops.append((h_name, h_cx, h_cy))
+                
+                power_delay = hero.get("power_delay", 7)
+                hero_drops.append((h_name, h_cx, h_cy, power_delay))
                 
             if hero_drops:
-                action_queue.append(("wait", 0, 0, self.HERO_DELAY_BEFORE_ABILITY, "Wait for Hero Spawn"))
-                for h_name, h_cx, h_cy in hero_drops:
+                # Sort by power_delay so we wait incrementally
+                hero_drops_sorted = sorted(hero_drops, key=lambda h: h[3])
+                elapsed = 0.0
+                for h_name, h_cx, h_cy, p_delay in hero_drops_sorted:
+                    wait_now = max(0, p_delay - elapsed)
+                    if wait_now > 0:
+                        action_queue.append(("wait", 0, 0, wait_now, f"Wait {wait_now:.1f}s for {h_name} ability"))
+                        elapsed += wait_now
                     action_queue.append(("select", h_cx, h_cy, self.HERO_DELAY_AFTER_ABILITY, f"Ability {h_name}"))
 
         # ----------------------------------------------------

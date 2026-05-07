@@ -100,7 +100,11 @@ class UpgradeManager:
         if not self.bot_running_check():
             return False
         
-        walls_to_do.sort(key=lambda x: x.get("cost", float('inf')))
+        # Sort from cheapest to most expensive so we ALWAYS exhaust resources on cheap walls first
+        def safe_cost(w):
+            try: return int(w.get("cost", float('inf')))
+            except: return float('inf')
+        walls_to_do.sort(key=safe_cost)
         
         self.log_callback(f"[BOT] Starting Wall Upgrade Sequence for {len(walls_to_do)} wall types...", "bot")
         
@@ -123,8 +127,12 @@ class UpgradeManager:
                 
                 can_use_elixir = target_cost >= self.ELIXIR_COST_THRESHOLD
                 
-                afford_gold = curr_gold // target_cost
-                afford_elixir = curr_elixir // target_cost if can_use_elixir else 0
+                # Keep 100,000 gold in reserve to allow searching for matches
+                available_gold = max(0, curr_gold - 100000)
+                available_elixir = curr_elixir
+                
+                afford_gold = available_gold // target_cost
+                afford_elixir = available_elixir // target_cost if can_use_elixir else 0
                 
                 if afford_gold == 0 and afford_elixir == 0:
                     self.log_callback(f"[BOT] Cannot afford more walls of cost {target_cost:,}.", "sys")
@@ -168,48 +176,144 @@ class UpgradeManager:
                     self.log_callback(f"[BOT] Scanning menu with {engine_type}...", "sys")
                     
                     h, w = crop.shape[:2]
-                    num_rows = 6
-                    row_h = h // num_rows
                     
-                    for i in range(num_rows):
-                        if not self.bot_running_check():
-                            return False
-                        row_img = crop[i*row_h : (i+1)*row_h, :]
+                    if engine_type == "TESSERACT":
+                        # --- Full-image approach with positional word data ---
+                        processed_crop = preprocess_for_ocr(crop, "upgrades_menu")
                         
-                        r_text = ""
-                        if engine_type == "GLM":
-                            try:
-                                _, r_buf = cv2.imencode('.png', row_img)
-                                r_b64 = base64.b64encode(r_buf).decode('utf-8')
-                                r_payload = {
-                                    "model": OLLAMA_MODEL,
-                                    "prompt": "Extract text.",
-                                    "images": [r_b64],
-                                    "stream": False,
-                                    "options": {"temperature": 0.0}
-                                }
-                                r_res = requests.post(OLLAMA_URL, json=r_payload, timeout=10)
-                                r_text = r_res.json().get("response", "").lower()
-                            except:
-                                pass
-                        elif engine_type == "TESSERACT":
-                            processed_row = preprocess_for_ocr(row_img, "upgrades_menu")
-                            r_text = pytesseract.image_to_string(processed_row).lower()
-                        elif engine_type == "RAPID" and rapid_engine:
-                            r_res, _ = rapid_engine(row_img)
-                            if r_res:
-                                r_text = " ".join([item[1] for item in r_res]).lower()
+                        # Save debug images
+                        save_screenshots = self.config_getters.get("get_debug_screenshots", lambda: True)()
+                        if save_screenshots:
+                            os.makedirs("response", exist_ok=True)
+                            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                            cv2.imwrite(f"response/debug_menu_raw_{ts}.png", crop)
+                            cv2.imwrite(f"response/debug_menu_proc_{ts}.png", processed_crop)
                         
-                        c_text = r_text.replace(" ", "").replace(",", "").replace(".", "")
-                        str_cost = str(target_cost)
+                        data = pytesseract.image_to_data(
+                            processed_crop, config='--psm 6',
+                            output_type=pytesseract.Output.DICT
+                        )
                         
-                        if "wall" in r_text and str_cost in c_text:
-                            found_y = i * row_h + (row_h * 0.2)
-                            rel_y = roi["y"] + (found_y / frame.shape[0])
-                            rel_x = roi["x"] + (roi["w"] / 2.0)
-                            wall_coords = {"x": rel_x, "y": rel_y, "w": 0.0, "h": 0.0}
-                            wall_found = True
-                            break
+                        # Group words into lines by Y-proximity
+                        lines_map = {}
+                        for idx in range(len(data['text'])):
+                            txt = data['text'][idx].strip()
+                            conf = int(data['conf'][idx])
+                            if not txt or conf < 1:
+                                continue
+                            top = data['top'][idx]
+                            # Find an existing line within 20px
+                            placed = False
+                            for key in lines_map:
+                                if abs(top - key) < 20:
+                                    lines_map[key]['words'].append(txt)
+                                    lines_map[key]['min_top'] = min(lines_map[key]['min_top'], top)
+                                    placed = True
+                                    break
+                            if not placed:
+                                lines_map[top] = {'words': [txt], 'min_top': top}
+                        
+                        # Check each detected line for wall match
+                        for key in sorted(lines_map.keys()):
+                            line_data = lines_map[key]
+                            r_text = ' '.join(line_data['words']).lower()
+                            
+                            r_text_clean = r_text.replace("s", "5").replace("o", "0").replace("l", "1").replace("i", "1")
+                            clean_for_cost = r_text_clean
+                            for ww in ["wa11", "wa1", "vva11", "wall", "wal"]:
+                                clean_for_cost = clean_for_cost.replace(ww, "")
+                            c_text = clean_for_cost.replace(" ", "").replace(",", "").replace(".", "")
+                            
+                            has_wall = "wall" in r_text or "wal" in r_text or "wa11" in r_text_clean or "wa1" in r_text_clean
+                            
+                            str_cost = str(target_cost)
+                            is_match = False
+                            if has_wall:
+                                if str_cost in c_text:
+                                    is_match = True
+                                else:
+                                    import re
+                                    text_no_qty = re.sub(r'x\s*\d+', '', clean_for_cost)
+                                    digits = re.sub(r'\D', '', text_no_qty)
+                                    if digits:
+                                        try:
+                                            read_cost = int(digits)
+                                            if abs(read_cost - target_cost) / max(target_cost, 1) <= 0.25:
+                                                is_match = True
+                                        except:
+                                            pass
+                            
+                            if is_match:
+                                # Divide by 2 because preprocess upscales 2x
+                                found_y = line_data['min_top'] / 2.0
+                                rel_y = roi["y"] + (found_y / frame.shape[0])
+                                rel_x = roi["x"] + (roi["w"] / 2.0)
+                                wall_coords = {"x": rel_x, "y": rel_y, "w": 0.0, "h": 0.0}
+                                wall_found = True
+                                break
+                    
+                    else:
+                        # --- Row-by-row approach for GLM / RAPID ---
+                        num_rows = 6
+                        row_h = h // num_rows
+                        
+                        for i in range(num_rows):
+                            if not self.bot_running_check():
+                                return False
+                            row_img = crop[i*row_h : (i+1)*row_h, :]
+                            
+                            r_text = ""
+                            if engine_type == "GLM":
+                                try:
+                                    _, r_buf = cv2.imencode('.png', row_img)
+                                    r_b64 = base64.b64encode(r_buf).decode('utf-8')
+                                    r_payload = {
+                                        "model": OLLAMA_MODEL,
+                                        "prompt": "Extract text.",
+                                        "images": [r_b64],
+                                        "stream": False,
+                                        "options": {"temperature": 0.0}
+                                    }
+                                    r_res = requests.post(OLLAMA_URL, json=r_payload, timeout=10)
+                                    r_text = r_res.json().get("response", "").lower()
+                                except:
+                                    pass
+                            elif engine_type == "RAPID" and rapid_engine:
+                                r_res, _ = rapid_engine(row_img)
+                                if r_res:
+                                    r_text = " ".join([item[1] for item in r_res]).lower()
+                            
+                            r_text_clean = r_text.replace("s", "5").replace("o", "0").replace("l", "1").replace("i", "1")
+                            clean_for_cost = r_text_clean
+                            for ww in ["wa11", "wa1", "vva11", "wall", "wal"]:
+                                clean_for_cost = clean_for_cost.replace(ww, "")
+                            c_text = clean_for_cost.replace(" ", "").replace(",", "").replace(".", "")
+                            
+                            str_cost = str(target_cost)
+                            
+                            is_match = False
+                            if "wall" in r_text or "wal" in r_text or "wa11" in r_text_clean or "wa1" in r_text_clean:
+                                if str_cost in c_text:
+                                    is_match = True
+                                else:
+                                    import re
+                                    text_no_qty = re.sub(r'x\s*\d+', '', clean_for_cost)
+                                    digits = re.sub(r'\D', '', text_no_qty)
+                                    if digits:
+                                        try:
+                                            read_cost = int(digits)
+                                            if abs(read_cost - target_cost) / max(target_cost, 1) <= 0.25:
+                                                is_match = True
+                                        except:
+                                            pass
+                            
+                            if is_match:
+                                found_y = i * row_h + (row_h * 0.2)
+                                rel_y = roi["y"] + (found_y / frame.shape[0])
+                                rel_x = roi["x"] + (roi["w"] / 2.0)
+                                wall_coords = {"x": rel_x, "y": rel_y, "w": 0.0, "h": 0.0}
+                                wall_found = True
+                                break
                             
                     if wall_found:
                         break

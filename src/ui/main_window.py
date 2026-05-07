@@ -104,7 +104,8 @@ class AutoWallsUI:
             "update_upgrade_preview": lambda proc: setattr(self, "current_upgrade_preview", proc),
             "update_gold": lambda val: self.card_gold.set_value(val) if hasattr(self, 'card_gold') else None,
             "update_elixir": lambda val: self.card_elixir.set_value(val) if hasattr(self, 'card_elixir') else None,
-            "stop_bot": lambda: self.root.after(0, self.on_start_bot) if self.bot_running else None
+            "stop_bot": lambda: self.root.after(0, self.on_start_bot) if self.bot_running else None,
+            "get_wall_check_freq": lambda: self.wall_check_freq_var.get() if hasattr(self, 'wall_check_freq_var') else 1,
         }
         
         self.upgrade_manager = UpgradeManager(
@@ -166,7 +167,15 @@ class AutoWallsUI:
                     return
                 
                 self.ui.root.after(0, self.ui.log_terminal, "  - Home Screen detected. Waiting for UI to stabilize...", "sys")
-                time.sleep(2.0)
+                
+                # Poll for village stability instead of fixed sleep
+                stable_timeout = time.time() + 10.0
+                while time.time() < stable_timeout:
+                    time.sleep(0.5)
+                    f2 = self.ui._safe_capture()
+                    if f2 is not None and is_main_screen(f2, self.ui.rois["main_screen_i"]):
+                        self.ui.root.after(0, self.ui.log_terminal, "  - Village UI stable.", "sys")
+                        break
                 
                 frame = self.ui._safe_capture()
                 if frame is None:
@@ -343,6 +352,7 @@ class AutoWallsUI:
             if "auto_donate" in cfg: self.auto_donate_var.set(cfg["auto_donate"])
             if "anti_afk" in cfg: self.anti_afk_var.set(cfg["anti_afk"])
             if "auto_wall" in cfg: self.auto_wall_var.set(cfg["auto_wall"])
+            if "wall_check_freq" in cfg: self.wall_check_freq_var.set(cfg["wall_check_freq"])
             if "debug_ss" in cfg: self.debug_ss_var.set(cfg["debug_ss"])
             
             cached_upg = self.state_cache.get("upgrades_info")
@@ -352,6 +362,8 @@ class AutoWallsUI:
                 walls = sum(item.get("qty", 1) for item in cached_upg.get("upgrades",[])
                             if "wall" in item.get("name", "").lower())
                 self.badge_walls.set(str(walls))
+                
+                self.root.after(100, self._render_walls_ui)
             
             if hasattr(self, 'global_validate_and_update'):
                 self.global_validate_and_update()
@@ -381,6 +393,7 @@ class AutoWallsUI:
             "auto_donate": self.auto_donate_var.get(),
             "anti_afk": self.anti_afk_var.get(),
             "auto_wall": self.auto_wall_var.get(),
+            "wall_check_freq": self.wall_check_freq_var.get(),
             "debug_ss": self.debug_ss_var.get() if hasattr(self, 'debug_ss_var') else True
         }
         
@@ -535,8 +548,26 @@ class AutoWallsUI:
             font=("Courier", 8, "bold"), cursor="hand2",
             command=self.save_state,
         )
-        cb_auto_wall.pack(side="left", padx=(0, 8))
+        cb_auto_wall.pack(side="left", padx=(0, 4))
         self.config_widgets.append(cb_auto_wall)
+
+        self.wall_check_freq_var = tk.IntVar(value=1)
+        freq_frame = tk.Frame(right, bg=BG_DEEP)
+        freq_frame.pack(side="left", padx=(0, 8))
+        tk.Label(freq_frame, text="EVERY", font=("Courier", 7, "bold"),
+                 bg=BG_DEEP, fg=FG_DIM).pack(side="left")
+        freq_spin = tk.Spinbox(
+            freq_frame, from_=1, to=20, width=3,
+            textvariable=self.wall_check_freq_var,
+            font=("Courier", 8, "bold"),
+            bg=BG_CARD2, fg=FG_PRIMARY, buttonbackground=BG_CARD2,
+            relief="flat", highlightthickness=1, highlightbackground=BORDER,
+            command=self.save_state,
+        )
+        freq_spin.pack(side="left", padx=2)
+        self.config_widgets.append(freq_spin)
+        tk.Label(freq_frame, text="ATK", font=("Courier", 7, "bold"),
+                 bg=BG_DEEP, fg=FG_DIM).pack(side="left")
         
         cb_anti_afk = tk.Checkbutton(
             right, text="ANTI AFK", variable=self.anti_afk_var,
@@ -638,6 +669,11 @@ class AutoWallsUI:
                                       ACCENT_DARK, small=True)
         for b in (self.btn_upg_tess, self.btn_upg_glm, self.btn_upg_rapid):
             b.pack(side="left", padx=(0, 4))
+            
+        self.btn_save_upg = make_btn(upg_row, "SAVE EDITS",
+                                      self._save_upgrades_json,
+                                      ACCENT_RED, small=True)
+        self.btn_save_upg.pack(side="right", padx=(0, 4))
 
         text_container = tk.Frame(col, bg=BG_DEEP, height=175)
         text_container.pack(fill="x", pady=(0, 5))
@@ -652,7 +688,12 @@ class AutoWallsUI:
         self.upgrades_text.pack(fill="both", expand=True)
         
         self.upgrades_text.insert(tk.END, "Waiting for Home Screen scan...")
-        self.upgrades_text.configure(state="disabled")
+
+        self._hsep(col)
+        self._col_label(col, "WALL TARGETS", ACCENT_GOLD)
+
+        self.walls_container = tk.Frame(col, bg=BG_DEEP)
+        self.walls_container.pack(fill="x", pady=(0, 5))
 
     def _build_enemy_col(self, parent):
         col = tk.Frame(parent, bg=BG_DEEP)
@@ -1224,7 +1265,14 @@ class AutoWallsUI:
                             sf = 700.0 / display_img.shape[0]
                             display_img = cv2.resize(display_img, (0, 0), fx=sf, fy=sf)
                 else:
-                    frame = self._safe_capture()
+                    try:
+                        frame = self._safe_capture()
+                    except ReloadGameException:
+                        frame = None
+                    except Exception as e:
+                        print(f"[PREVIEW] Capture error: {e}")
+                        frame = None
+
                     if frame is not None:
                         on_main = is_main_screen(frame, self.rois["main_screen_i"])
                         keys =["gold", "elixir", "dark_elixir"] if on_main \
@@ -1452,14 +1500,89 @@ class AutoWallsUI:
         self.badge_walls.set(str(walls))
 
         txt = json.dumps(upg, indent=2) if isinstance(upg, dict) else str(upg)
-        self.upgrades_text.configure(state="normal")
         self.upgrades_text.delete(1.0, tk.END)
         self.upgrades_text.insert(tk.END, txt)
-        self.upgrades_text.configure(state="disabled")
+        
+        self._render_walls_ui()
 
         self.log_rich(ts, raw)
         self.log_terminal(f"  ✓ {engine.upper()} scan complete in {elapsed:.2f}s\n", "sys")
         self.reset_buttons()
+
+    def _save_upgrades_json(self):
+        content = self.upgrades_text.get(1.0, tk.END).strip()
+        try:
+            parsed = json.loads(content)
+            self.latest_data["upgrades_info"] = parsed
+            self.state_cache["upgrades_info"] = parsed
+            self.save_state()
+            
+            walls = sum(item.get("qty", 1) for item in parsed.get("upgrades", []) if "wall" in item.get("name", "").lower())
+            self.badge_walls.set(str(walls))
+            
+            self._render_walls_ui()
+            
+            self.log_terminal("[SYS] Upgrades data manually updated and saved.", "sys")
+        except Exception as e:
+            self.log_terminal(f"[ERROR] Invalid JSON format: {e}", "bot_off")
+
+    def _render_walls_ui(self):
+        for widget in self.walls_container.winfo_children():
+            widget.destroy()
+            
+        upg_data = self.latest_data.get("upgrades_info", {})
+        walls =[item for item in upg_data.get("upgrades", []) if "wall" in item.get("name", "").lower()]
+        
+        if not walls:
+            tk.Label(self.walls_container, text="No walls detected.", 
+                     bg=BG_DEEP, fg=FG_DIM, font=("Courier", 8)).pack(anchor="w", pady=5)
+            return
+
+        self.wall_entries =[]
+        for idx, wall in enumerate(upg_data.get("upgrades", [])):
+            if "wall" not in wall.get("name", "").lower():
+                continue
+                
+            row = tk.Frame(self.walls_container, bg=BG_DEEP)
+            row.pack(fill="x", pady=2)
+            
+            qty = wall.get("qty", 1)
+            name_text = f"Wall x{qty}"
+            tk.Label(row, text=name_text, bg=BG_DEEP, fg=FG_PRIMARY, 
+                     font=("Courier", 8, "bold"), width=12, anchor="w").pack(side="left")
+            
+            cost_var = tk.StringVar(value=str(wall.get("cost", 0)))
+            entry = tk.Entry(row, textvariable=cost_var, bg=BG_PANEL, fg=FG_SECONDARY,
+                             font=("Courier", 8), width=15, relief="flat",
+                             highlightthickness=1, highlightbackground=BORDER, highlightcolor=ACCENT_GOLD)
+            entry.pack(side="left", padx=5)
+            
+            self.wall_entries.append({"index": idx, "var": cost_var})
+            
+        btn_save_walls = make_btn(self.walls_container, "SAVE WALL COSTS",
+                                  self._save_wall_targets_ui,
+                                  "#22c55e", small=True)
+        btn_save_walls.pack(anchor="e", pady=(5, 0))
+
+    def _save_wall_targets_ui(self):
+        try:
+            upgrades = self.latest_data.get("upgrades_info", {}).get("upgrades", [])
+            for entry_data in self.wall_entries:
+                idx = entry_data["index"]
+                val = entry_data["var"].get().replace(" ", "").replace(",", "")
+                upgrades[idx]["cost"] = int(val)
+                
+            self.latest_data["upgrades_info"]["upgrades"] = upgrades
+            self.state_cache["upgrades_info"] = self.latest_data["upgrades_info"]
+            self.save_state()
+            self.log_terminal("[SYS] Wall targets saved.", "sys")
+            
+            txt = json.dumps(self.latest_data["upgrades_info"], indent=2)
+            self.upgrades_text.delete(1.0, tk.END)
+            self.upgrades_text.insert(tk.END, txt)
+            
+        except Exception as e:
+            self.log_terminal(f"[ERROR] Invalid wall cost: {e}", "bot_off")
 
     def log_rich(self, timestamp: str, raw: dict):
         self.terminal.configure(state="normal")

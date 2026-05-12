@@ -10,288 +10,259 @@
         "use_tgt_dark": 0,
         "tgt_gold": 1000000,
         "tgt_elx": 1000000,
-        "tgt_goel": 1750000,
+        "tgt_goel": 900000,
         "tgt_dark": 3000,
         "ai_mode": "STATIC",
         "ai_model": "GEMINI 3.1 PRO PREVIEW",
         "api_key": "",
-        "auto_donate": true,
+        "auto_donate": false,
         "anti_afk": false,
         "auto_wall": true,
-        "wall_check_freq": 4,
-        "debug_ss": false
+        "wall_check_freq": 3,
+        "debug_ss": false,
+        "opacity": 100
     },
     "last_upgrades_ts": 1777850112.758264,
     "upgrades_info": {
         "engine": "tesseract",
-        "total_items_found": 44,
+        "total_items_found": 39,
         "upgrades": [
             {
                 "name": "Elixir Collector",
                 "qty": 5,
-                "cost": 1700000,
+                "cost": 1600000,
                 "resource": "Gold"
             },
             {
-                "name": "Gold Mine",
-                "qty": 5,
-                "cost": 1700000,
-                "resource": "Elixir"
-            },
-            {
-                "name": "Archer Queen",
+                "name": "Pet House",
                 "qty": 1,
-                "cost": 148750,
-                "resource": "n/d"
+                "cost": 600000,
+                "resource": "Elixir"
             },
             {
                 "name": "Royal Champion",
                 "qty": 1,
-                "cost": 14750,
+                "cost": 108000,
                 "resource": "Dark Elixir"
             },
             {
                 "name": "Minion Prince",
                 "qty": 1,
-                "cost": 10500,
+                "cost": 104000,
                 "resource": "Dark Elixir"
             },
             {
                 "name": "Monolith",
                 "qty": 1,
-                "cost": 170000,
+                "cost": 160000,
                 "resource": "Dark Elixir"
+            },
+            {
+                "name": "Gold Mine",
+                "qty": 5,
+                "cost": 1600000,
+                "resource": "Elixir"
             },
             {
                 "name": "Gold Storage",
                 "qty": 4,
-                "cost": 3400000,
+                "cost": 3200000,
                 "resource": "Elixir"
             },
             {
                 "name": "Wall",
-                "qty": 280,
-                "cost": 3400000,
-                "resource": "Gold or Elixir"
-            },
-            {
-                "name": "Wall",
-                "qty": 15,
-                "cost": 2550000,
+                "qty": 278,
+                "cost": 3200000,
                 "resource": "Gold or Elixir"
             },
             {
                 "name": "Hero Hall",
                 "qty": 1,
-                "cost": 9350000,
-                "resource": "Elixir"
-            },
-            {
-                "name": "Pet House",
-                "qty": 1,
-                "cost": 950000,
+                "cost": 8800000,
                 "resource": "Elixir"
             },
             {
                 "name": "Blacksmith",
                 "qty": 1,
-                "cost": 8500000,
-                "resource": "Elixir"
-            },
-            {
-                "name": "Laboratory",
-                "qty": 1,
-                "cost": 8180000,
+                "cost": 8000000,
                 "resource": "Elixir"
             },
             {
                 "name": "Clan Castle",
                 "qty": 1,
-                "cost": 10200000,
+                "cost": 3600000,
+                "resource": "Elixir"
+            },
+            {
+                "name": "Clan Castle",
+                "qty": 1,
+                "cost": 9600000,
                 "resource": "Elixir"
             },
             {
                 "name": "Workshop",
                 "qty": 1,
-                "cost": 350000,
+                "cost": 8800000,
                 "resource": "Elixir"
             },
             {
                 "name": "Army Camp",
                 "qty": 4,
-                "cost": 8500000,
+                "cost": 8000000,
                 "resource": "Elixir"
             },
             {
                 "name": "Barracks",
                 "qty": 1,
-                "cost": 10710000,
+                "cost": 10080000,
                 "resource": "Elixir"
             },
             {
                 "name": "Dark Barracks",
                 "qty": 1,
-                "cost": 17000000,
-                "resource": "Elixir"
-            },
-            {
-                "name": "Workshop",
-                "qty": 1,
-                "cost": 9350000,
+                "cost": 16000000,
                 "resource": "Elixir"
             },
             {
                 "name": "Dark Elixir Storage",
                 "qty": 1,
-                "cost": 6800000,
+                "cost": 6400000,
                 "resource": "Elixir"
             },
             {
                 "name": "Elixir Storage",
                 "qty": 4,
-                "cost": 3400000,
+                "cost": 3200000,
+                "resource": "Gold"
+            },
+            {
+                "name": "Mortar",
+                "qty": 3,
+                "cost": 4000000,
                 "resource": "Gold"
             },
             {
                 "name": "Archer Tower",
                 "qty": 8,
-                "cost": 3400000,
+                "cost": 3200000,
                 "resource": "Gold"
             },
             {
                 "name": "Cannon",
                 "qty": 7,
-                "cost": 2550000,
+                "cost": 2400000,
+                "resource": "Gold"
+            },
+            {
+                "name": "Seeking Air Mine",
+                "qty": 8,
+                "cost": 4000000,
                 "resource": "Gold"
             },
             {
                 "name": "Spring Trap",
                 "qty": 9,
-                "cost": 3400000,
+                "cost": 3200000,
                 "resource": "Gold"
             },
             {
                 "name": "Giant Bomb",
                 "qty": 6,
-                "cost": 2720000,
+                "cost": 2560000,
                 "resource": "Gold"
             },
             {
                 "name": "Air Bomb",
                 "qty": 6,
-                "cost": 2550000,
+                "cost": 2400000,
                 "resource": "Gold"
             },
             {
                 "name": "Bomb",
                 "qty": 7,
-                "cost": 2125000,
+                "cost": 2000000,
                 "resource": "Gold"
             },
             {
                 "name": "Giant Bomb",
                 "qty": 1,
-                "cost": 1275000,
+                "cost": 1200000,
                 "resource": "Gold"
             },
             {
                 "name": "Air Bomb",
                 "qty": 1,
-                "cost": 850000,
+                "cost": 800000,
                 "resource": "Gold"
             },
             {
                 "name": "Bomb",
                 "qty": 1,
-                "cost": 280500,
-                "resource": "Gold"
-            },
-            {
-                "name": "Mortar",
-                "qty": 4,
-                "cost": 4250000,
-                "resource": "Gold"
-            },
-            {
-                "name": "Wizard Tower",
-                "qty": 5,
-                "cost": 4675000,
-                "resource": "Gold"
-            },
-            {
-                "name": "Bomb",
-                "qty": 1,
-                "cost": 2805500,
+                "cost": 264000,
                 "resource": "Gold"
             },
             {
                 "name": "Builder's Hut",
                 "qty": 5,
-                "cost": 5950000,
+                "cost": 5600000,
+                "resource": "Gold"
+            },
+            {
+                "name": "Wizard Tower",
+                "qty": 5,
+                "cost": 4400000,
                 "resource": "Gold"
             },
             {
                 "name": "Hidden Tesla",
                 "qty": 4,
-                "cost": 5525000,
+                "cost": 5200000,
                 "resource": "Gold"
             },
             {
                 "name": "Bomb Tower",
                 "qty": 2,
-                "cost": 5950000,
+                "cost": 5600000,
                 "resource": "Gold"
             },
             {
-                "name": "Air Defense",
-                "qty": 4,
-                "cost": 6800000,
-                "resource": "Gold"
-            },
-            {
-                "name": "Spell Tower",
+                "name": "Air Bornb",
                 "qty": 1,
-                "cost": 7650000,
+                "cost": 800000,
+                "resource": "n/d"
+            },
+            {
+                "name": "Air DeFense",
+                "qty": 4,
+                "cost": 6400000,
                 "resource": "Gold"
             },
             {
                 "name": "Inferno Tower",
                 "qty": 3,
-                "cost": 8500000,
+                "cost": 8000000,
+                "resource": "Gold"
+            },
+            {
+                "name": "Spell Tower",
+                "qty": 1,
+                "cost": 8800000,
                 "resource": "Gold"
             },
             {
                 "name": "Scattershot",
                 "qty": 2,
-                "cost": 9775000,
+                "cost": 3200000,
                 "resource": "Gold"
             },
             {
-                "name": "Air DeFense",
-                "qty": 4,
-                "cost": 6800000,
-                "resource": "Gold"
-            },
-            {
-                "name": "InFerno Tower",
-                "qty": 3,
-                "cost": 8500000,
-                "resource": "Gold"
-            },
-            {
-                "name": "Scatbershot",
+                "name": "Scattershot",
                 "qty": 2,
-                "cost": 9775000,
-                "resource": "n/d"
-            },
-            {
-                "name": "Seeking Air Mine",
-                "qty": 8,
-                "cost": 4250000,
+                "cost": 200000,
                 "resource": "Gold"
             }
         ],
-        "raw_text": "--- Page 1 ---\nHidden Tesla _!d7H\n\nSpell Tower _3d 20H\n\nSpell Factory _4d 17H\nEagle Artillery _5d 3H\n\n> . Available!\n\nElixir Collector x5 1700 000\n\nGold Mine xS \u20181700 000\n\nArcher Queen - 148 750\n\nDaanal Chamninn : _ Aa Tc\n--- Page 2 ---\nElixir Collector x5 1700 000\nGold Mine x5 \u20181700 000\nArcher Queen - 148 750\nRoyal Champion -14 750\nMinion Prince - lo 500\nNew Monolith -170 000\nGold Storage x4 -3 400 000\nWall x280 -3 400 000\nWall x15 -2550 000\nHero Hall -9 350 000\nPet House *$ 950 000\n--- Page 3 ---\nvu vuuU ays av Jue vu\nWall x280 -3 400 000\nWall x15 -2550000\nHero Hall -9 350 000\nPet House -$ 950 000\nBlacksmith -8 500 000\nLaboratory -\u00a78180 000\nClan Castle \u201810 200 000\nWorkshop -\u00a7 350 000\nArmy Camp x4 -8500 000\nBarracks -10 710 000\nDark Barracks \u201817000 000\n--- Page 4 ---\nWorkshop \u20189 350 000\nArmy Camp x4 -8 500 000\nBarracks -10 710 GOO\nDark Barracks \u201817000 000\nDark Elixir Storage -6 800 000\nElixir Storage x4 3 400 000\nArcher Tower x8 3 400 000\nCannon x7 2550 000\nSpring Trap x9 3 400 000\nGiant Bomb x6 2720 000\nAir Bomb x6 2550 000\n--- Page 5 ---\nCannon x7 2550 000\nSpring Trap x93 3 400 000\nGiant Bomb x6 2720 000\nAir Bomb x6 2550 000\nBomb x7 2125 000\nGiant Bomb 1275 000\nAir Bomb 850 000\nBomb 280 500\nBuilder\u2019s Hut x5 5 950 000\nMortar x4 4250 000\nWizard Tower xS 4675 000\n--- Page 6 ---\nBomb 280 S500\nBuilder's Hut x5 5 950 000\nMortar x4 4250 000\nWizard Tower x5 4675 000\nHidden Tesla x4 5 525 000\nBomb Tower x2 5 950 000\nAir Defense x4 6 800 000\nNew Spell Tower 7650 000\nX-Bow x4 8075 000\nInferno Tower x3 8500 000\nScattershot x2 9775 000\nSeeking Air Mine xR =a 26n nnn,\n--- Page 7 ---\nBuilder's Hut xS 5 950 000\nMortar x4 4250 000\nWizard Tower x5 4675 000\nHidden Tesla x4 5 525 000\nBomb Tower x2 5 950 000\nAir DeFense x4 6 800 000\nNew Spell Tower 7650000\nX-Bow x4 8 075 000\nInFerno Tower x3 8 500 000\nScatbershot x2 9775 000\nSeeking Air Mine x8 4250 000\n--- Page 8 ---\nBuilder's Hut x5 5 950 000\nMortar x4 4250 000\nWizard Tower x5 4675 000\nHidden Tesla x4 5 525 000\nBomb Tower x2 5 950 000\nAir DeFense x4 6 800 000\nNew Spell Tower 7650 000\nX-Bow x4 8 075 000\nInFerno Tower x3 8 500 000\nScatbershot x2 9775 000\nSeeking Air Mine x8 4250 000\n--- Page 9 ---\nBuilder's Hut x5 5 950 000\nMortar x4 4250 000\nWizard Tower x5 4675 000\nHidden Tesla x4 5 525 000\nBomb Tower x2 5 950 000\nAir DeFense x4 6 800 000\nNew Spell Tower 7650000\nX-Bow x4 8 075 000\nInFerno Tower x3 8 500 000\nScatbershot x2 9775 000\nSeeking Air Mine x8 4250 000"
+        "raw_text": "--- Page 1 ---\nCat Available!\n\nArcher Queen _2d 23H\nLaboratory _3d len\nSpell Tower _4d 13H\n\n> . Available!\nElixir Collector x5 1600 000\nPet House -$ 600 000\nRoyal Champion - 108 000\n~Mininn Orninrao nA ANA\n--- Page 2 ---\nElixir Collector x5 1600 000\nPet House -$ 600 000\nRoyal Champion - 108 000\nMinion Prince -104 000\nNew Monolith - 160 000\nGold Mine x5 \u20181600 000\nGold Storage x4 -3 200 000\nWall x280 -3 200 000\nHero Hall \u20188 800 000\nBlacksmith \u20188000 000\nClan Castle -3 600 000\n--- Page 3 ---\nYuu vuU! aYyG Ate 2 cuuw vuu\nWall x280 -3200 000\nHero Hall -8 800 000\nBlacksmith -8 000 000\nClan Castle -\u00a79600 000\nWorkshop -8 800 000\nArmy Camp x4 -8 000 000\nBarracks \u201810 080 000\nDark Barracks -16 000 000\nDark Elixir Storage -6 400 000\nElixir Storage x4 3 200 000\nMortar x3 4000 000\n--- Page 4 ---\nDark Barracks \u201816 000 000\nDark Elixir Storage \u20186400 000\nElixir Storage x4 3 200 000\nMortar x3 4000 000\nArcher Tower x8 3 200 000\nCannon x7 2400 000\nSeeking Air Mine x8 4000 000\nSpring Trap x9 3 200 000\nGiant Bomb x6 2560 000\nAir Bomb x6 2400 000\nBomb x7 2000 000\n--- Page 5 ---\nSpring Trap x9 3 200 000\nGiant Bomb x6 2560 000\nAir Bomb x6 2400 000\nBomb x7 2000 000\nGiant Bomb 1200 000\nAir Bomb 800 000\nBomb 264 000\nBuilder's Hut x5 5 600 000\nWizard Tower x5 4 400 000\nHidden Tesla x4 5 200 000\nBomb Tower x2 5 600 000\n--- Page 6 ---\nAir Bornb 800 000\nBomb 264 000\nBuilder's Hut xS 5 600 000\nWizard Tower x5 4 400 000\nHidden Tesla x4 5 200 000\nBomb Tower x2 5 600 000\nAir DeFense x4 6 400 000\nX-Bow x4 7600 000\nInferno Tower x3 8 000 000\nSpell Tower 8 800 000\nScattershot x2 3 200 000\n--- Page 7 ---\nAir Bomb 800 000\nBomb 264 000\nBuilder's Hut xS 5 600 000\nWizard Tower x5 4 400 000\nHidden Tesla x4 5 200 000\nBomb Tower x2 5 600 000\nAir DeFense x4 6 400 000\nX-Bow x4 7600 000\nInferno Tower x3 8 000 000\nSpell Tower 8 800 000\nScattershot x2 3 200 000\n--- Page 8 ---\nAir Bomb 800 000\nBomb 264 000\nBuilder's Hut xS 5 600 000\nWizard Tower x5 4 400 000\nHidden Tesla x4 5 200 000\nBomb Tower x2 5 600 000\nAir DeFense x4 6 400 000\nX-Bow x4 7600 000\nInferno Tower x3 8 000 000\nSpell Tower 8 800 000\nScattershot x2 \u00a7 200 000\n--- Page 9 ---\nAir Bornb 800 000\nBomb 264 000\nBuilder's Hut xS 5 600 000\nWizard Tower x5 4 400 000\nHidden Tesla x4 5 200 000\nBomb Tower x2 5 600 000\nAir DeFense x4 6 400 000\nX-Bow x4 7600 000\nInferno Tower x3 8000 000\nSpell Tower 8 800 000\nScattershot x2 3 200 000\n--- Page 10 ---\nAir Bornb 800 000\nBomb 264 000\nBuilder's Hut xS 5 600 000\nWizard Tower x5 4 400 000\nHidden Tesla x4 5 200 000\nBomb Tower x2 5 600 000\nAir DeFense x4 6 400 000\nX-Bow x4 7600 000\nInferno Tower x3 8 000 000\nSpell Tower 8 800 000\nScattershot x2 \u00a7 200 000"
     },
-    "last_upgrade_scan": 1778132162.795631
+    "last_upgrade_scan": 1778557043.1485646
 }

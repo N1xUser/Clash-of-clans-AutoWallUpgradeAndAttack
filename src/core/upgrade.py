@@ -15,15 +15,15 @@ from src.vision.ocr import OLLAMA_MODEL, OLLAMA_URL, rapid_engine
 class UpgradeManager:
     CORNER_TOP_RIGHT = {"x": 0.95, "y": 0.05, "w": 0, "h": 0}
     
-    WALL_VERIFY_CENTER_X = 0.481
-    WALL_VERIFY_CENTER_Y = 0.794
+    WALL_VERIFY_CENTER_X = 0.520
+    WALL_VERIFY_CENTER_Y = 0.790
     
-    WALL_ADD_MORE = {"x": 0.467, "y": 0.802, "w": 0.0, "h": 0.0}
-    UPGRADE_BUTTON_GOLD = {"x": 0.550, "y": 0.793, "w": 0.0, "h": 0.0}
-    UPGRADE_BUTTON_ELIXIR = {"x": 0.628, "y": 0.804, "w": 0.0, "h": 0.0}
+    WALL_ADD_MORE = {"x": 0.500, "y": 0.800, "w": 0.0, "h": 0.0}
+    UPGRADE_BUTTON_GOLD = {"x": 0.600, "y": 0.800, "w": 0.0, "h": 0.0}
+    UPGRADE_BUTTON_ELIXIR = {"x": 0.650, "y": 0.800, "w": 0.0, "h": 0.0}
     
-    CONFIRM_BUTTON_SINGLE = {"x": 0.714, "y": 0.856, "w": 0.0, "h": 0.0}
-    CONFIRM_BUTTON_MULTI = {"x": 0.602, "y": 0.620, "w": 0.0, "h": 0.0}
+    CONFIRM_BUTTON_SINGLE = {"x": 0.700, "y": 0.850, "w": 0.0, "h": 0.0}
+    CONFIRM_BUTTON_MULTI = {"x": 0.620, "y": 0.620, "w": 0.0, "h": 0.0}
     
     CLOSE_MENU = {"x": 0.1, "y": 0.5, "w": 0, "h": 0}
     
@@ -41,9 +41,7 @@ class UpgradeManager:
         self.config_getters = config_getters or {}
 
     def _debug_click(self, roi, capture_callback, label="click"):
-        """Captures frame, draws a red dot where it's about to click, saves it, then clicks."""
         
-        # --- ADD THIS CHECK ---
         save_screenshots = self.config_getters.get("get_debug_screenshots", lambda: True)()
         
         if save_screenshots:
@@ -85,7 +83,7 @@ class UpgradeManager:
         time.sleep(0.5)
         
         self._debug_click(self.rois["builders_icon"], capture_callback, "reset_open_builders")
-        time.sleep(1.0)
+        time.sleep(0.5)
         
         menu_x = self.rois["upgrades_menu"]["x"] + (self.rois["upgrades_menu"]["w"] / 2.0)
         menu_y = self.rois["upgrades_menu"]["y"]
@@ -361,7 +359,8 @@ class UpgradeManager:
                 
                 if qty_to_do > 1:
                     self.log_callback(f"[BOT] Adding {qty_to_do - 1} more walls to selection...", "sys")
-                    for _ in range(qty_to_do - 1):
+
+                    for _ in range(qty_to_do):
                         self._debug_click(self.WALL_ADD_MORE, capture_callback, "add_wall")
                         time.sleep(0.5)
                 

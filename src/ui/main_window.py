@@ -354,6 +354,9 @@ class AutoWallsUI:
             if "auto_wall" in cfg: self.auto_wall_var.set(cfg["auto_wall"])
             if "wall_check_freq" in cfg: self.wall_check_freq_var.set(cfg["wall_check_freq"])
             if "debug_ss" in cfg: self.debug_ss_var.set(cfg["debug_ss"])
+            if "opacity" in cfg and hasattr(self, 'transparency_var'):
+                self.transparency_var.set(cfg["opacity"])
+                self._on_transparency_change(cfg["opacity"])
             
             cached_upg = self.state_cache.get("upgrades_info")
             if cached_upg:
@@ -394,7 +397,8 @@ class AutoWallsUI:
             "anti_afk": self.anti_afk_var.get(),
             "auto_wall": self.auto_wall_var.get(),
             "wall_check_freq": self.wall_check_freq_var.get(),
-            "debug_ss": self.debug_ss_var.get() if hasattr(self, 'debug_ss_var') else True
+            "debug_ss": self.debug_ss_var.get() if hasattr(self, 'debug_ss_var') else True,
+            "opacity": self.transparency_var.get() if hasattr(self, 'transparency_var') else 100
         }
         
         try:
@@ -585,6 +589,24 @@ class AutoWallsUI:
             font=("Courier", 8, "bold"), cursor="hand2",
             command=self._on_preview_toggle,
         ).pack(side="left", padx=(0, 12))
+
+        trans_frame = tk.Frame(right, bg=BG_DEEP)
+        trans_frame.pack(side="left", padx=(0, 12))
+        tk.Label(trans_frame, text="OPACITY", font=("Courier", 7, "bold"), bg=BG_DEEP, fg=FG_DIM).pack(side="left")
+        
+        self.transparency_var = tk.IntVar(value=100)
+        self.trans_scale = tk.Scale(
+            trans_frame, from_=20, to=100, orient="horizontal",
+            variable=self.transparency_var, command=self._on_transparency_change,
+            bg=BG_DEEP, fg=FG_PRIMARY, troughcolor=BG_PANEL,
+            highlightthickness=0, bd=0, activebackground=BG_DEEP,
+            font=("Courier", 7), sliderlength=10, length=60, showvalue=0
+        )
+        self.trans_scale.pack(side="left", padx=2)
+        self.trans_scale.bind("<ButtonRelease-1>", lambda e: self.save_state())
+        
+        self.trans_lbl = tk.Label(trans_frame, text="100%", font=("Courier", 7, "bold"), bg=BG_DEEP, fg=FG_PRIMARY)
+        self.trans_lbl.pack(side="left")
 
         tk.Frame(right, bg=BORDER, width=1).pack(
             side="left", fill="y", pady=4, padx=(0, 12))
@@ -986,6 +1008,12 @@ class AutoWallsUI:
 
     def _on_preview_toggle(self):
         self.preview_enabled = self.preview_var.get()
+        
+    def _on_transparency_change(self, val):
+        alpha = float(val) / 100.0
+        self.root.attributes("-alpha", alpha)
+        if hasattr(self, 'trans_lbl'):
+            self.trans_lbl.config(text=f"{int(float(val))}%")
     
     def _get_target_info_string(self):
         def get_tgt_str(use_var, val_var, suffix):

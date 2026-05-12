@@ -66,7 +66,7 @@ def preprocess_for_ocr(img, resource_name):
         return processed
 
     else:
-        target_tol = 23
+        target_tol = 29
         lower1 = np.array([max(0, 224-target_tol), max(0, 224-target_tol), max(0, 224-target_tol)])
         upper1 = np.array([min(255, 224+target_tol), min(255, 224+target_tol), min(255, 224+target_tol)])
         mask1 = cv2.inRange(img, lower1, upper1)

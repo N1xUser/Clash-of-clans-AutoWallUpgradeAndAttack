@@ -1,57 +1,57 @@
 {
   "available_troops": [
     {
-      "name": "Electric Dragon",
-      "x": 0.17,
+      "name": "Archer Queen",
+      "x": 0.15,
       "y": 0.9,
-      "quantity": 10
+      "quantity": 50
+    },
+    {
+      "name": "Electric Dragon",
+      "x": 0.22,
+      "y": 0.9,
+      "quantity": 50
     },
     {
       "name": "Log Launcher",
-      "x": 0.25,
+      "x": 0.29,
       "y": 0.9,
       "quantity": 1
     }
   ],
   "available_spells": [
     {
-      "name": "Lightning Spell 1",
-      "x": 0.57,
+      "name": "Lightning Spell",
+      "x": 0.64,
       "y": 0.9,
       "quantity": 11
-    },
-    {
-      "name": "Lightning Spell 2",
-      "x": 0.67,
-      "y": 0.9,
-      "quantity": 3
     }
   ],
   "available_heros": [
     {
       "name": "Royal Champion",
-      "x": 0.3,
+      "x": 0.36,
       "y": 0.9,
       "power_delay": 5
     },
     {
       "name": "Barbarian King",
-      "x": 0.37,
+      "x": 0.43,
       "y": 0.9,
       "power_delay": 12
     },
     {
       "name": "Grand Warden",
-      "x": 0.44,
+      "x": 0.5,
       "y": 0.9,
       "power_delay": 9
     },
     {
-      "name": "Archer King",
-      "x": 0.5,
+      "name": "Archer Queen",
+      "x": 0.57,
       "y": 0.9,
       "power_delay": 7
     }
   ],
-  "deployment_mode": "random"
+  "deployment_mode": "human"
 }

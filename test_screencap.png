@@ -1,0 +1,2 @@
+Use '--details-to-stdout' to get more details:
+  /usr/bin/waydroid --details-to-stdout shell screencap -p

@@ -101,8 +101,19 @@ def point_in_rect(px: int, py: int, rect: tuple) -> bool:
 
 def is_main_screen(frame: np.ndarray, i_roi: dict) -> bool:
     roi_img = crop_roi(frame, i_roi)
+    if roi_img is None or roi_img.size == 0:
+        return False
     proc = preprocess_for_ocr(roi_img, "main_screen_i")
+    if proc is None or proc.size == 0:
+        return False
+        
+    if len(proc.shape) > 2 and proc.shape[2] != 1:
+        proc = cv2.cvtColor(proc, cv2.COLOR_BGR2GRAY)
+        
     total_pixels = proc.shape[0] * proc.shape[1]
+    if total_pixels == 0:
+        return False
+        
     white_pixels = cv2.countNonZero(proc)
     black_pixels = total_pixels - white_pixels
     return black_pixels > 20

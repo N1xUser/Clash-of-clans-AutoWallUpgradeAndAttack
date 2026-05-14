@@ -124,15 +124,12 @@ class AttackManager:
                 
             t_cx, t_cy = self._get_troop_center(troop_info)
             
-            # 1. Select the troop
             action_queue.append(("select", t_cx, t_cy, self.ROBOT_DELAY_AFTER_SELECT, t_name))
             
-            # 2. Queue the drops
             for _ in range(qty):
                 action_queue.append(("drop", dx, dy, self.ROBOT_DELAY_AFTER_DROP, t_name))
                 tracked_drops.append((dx, dy, t_name))
         
-        # Save visualization BEFORE executing the rapid drops
         if tracked_drops:
             self._save_deployment_visualization(tracked_drops)
             
@@ -147,7 +144,6 @@ class AttackManager:
             click_relative_roi(self.hwnd, {"x": x, "y": y, "w": 0.0, "h": 0.0})
             time.sleep(delay)
             
-            # Only do the heavy safe_capture check once every 1 second to avoid bottlenecking the rapid-fire drops
             if time.time() - last_capture_time > 1.0:
                 try:
                     self._safe_capture()

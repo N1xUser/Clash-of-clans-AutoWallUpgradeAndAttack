@@ -5,6 +5,8 @@ import numpy as np
 from src.utils.config import CALIBRATION_ITEMS, RESOURCES, ROI_COLORS
 from src.vision.capture import capture_frame
 from src.vision.detection import preprocess_for_ocr, point_in_rect
+import threading
+import threading
 from src.utils.roi_manager import save_rois
 
 C_BG         = (10,  14,  20)
@@ -188,7 +190,7 @@ class Slider:
 # ─────────────────────────────────────────────────────────
 #  MAIN
 # ─────────────────────────────────────────────────────────
-def calibrate(hwnd: int, existing_rois: dict = None) -> dict:
+def calibrate(hwnd: int | str, existing_rois: dict = None) -> dict:
     rois  = existing_rois.copy() if existing_rois else {}
     mouse = {"x":0, "y":0, "event":-1}
 
@@ -212,6 +214,20 @@ def calibrate(hwnd: int, existing_rois: dict = None) -> dict:
 
     cv2.namedWindow(WIN_NAME, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(WIN_NAME, WIN_W, WIN_H)
+
+    shared_state = {"frame": None, "running": True}
+    
+    def _capture_worker():
+        while shared_state["running"]:
+            f = capture_frame(hwnd)
+            if f is not None:
+                shared_state["frame"] = f
+            import time
+            time.sleep(0.05)
+            
+    worker = threading.Thread(target=_capture_worker, daemon=True)
+    worker.start()
+
 
     step = 0
     last_roi = None
@@ -256,7 +272,7 @@ def calibrate(hwnd: int, existing_rois: dict = None) -> dict:
         cv2.setMouseCallback(WIN_NAME, on_mouse)
 
         while True:
-            frame = capture_frame(hwnd)
+            frame = shared_state["frame"]
             if frame is None:
                 time.sleep(0.05)
                 continue
@@ -397,5 +413,6 @@ def calibrate(hwnd: int, existing_rois: dict = None) -> dict:
                 cv2.destroyAllWindows()
                 sys.exit(0)
 
+    shared_state["running"] = False
     cv2.destroyAllWindows()
     return rois

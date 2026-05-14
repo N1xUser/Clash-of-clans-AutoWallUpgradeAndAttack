@@ -487,9 +487,35 @@ class AutoWallsUI:
                     
                     while getattr(self, "bot_running", False):
                         f = capture_frame(self.hwnd)
-                        if f is not None and is_main_screen(f, self.rois["main_screen_i"]):
-                            self.log_terminal("[BOT] Main village detected after reload! Initiating restart...", "sys")
-                            raise ReloadGameException("Game was reloaded. Restarting loop.")
+                        if f is not None:
+                            if is_main_screen(f, self.rois["main_screen_i"]):
+                                self.log_terminal("[BOT] Main village detected after reload! Initiating restart...", "sys")
+                                raise ReloadGameException("Game was reloaded. Restarting loop.")
+                            
+                            fh, fw = f.shape[:2]
+                            
+                            # Check for Match End screen (stars)
+                            s1_x, s1_y = int(0.870 * fw), int(0.445 * fh)
+                            s2_x, s2_y = int(0.170 * fw), int(0.540 * fh)
+                            s_col1 = np.mean(f[max(0, s1_y-2):s1_y+3, max(0, s1_x-2):s1_x+3])
+                            s_col2 = np.mean(f[max(0, s2_y-2):s2_y+3, max(0, s2_x-2):s2_x+3])
+                            
+                            if s_col1 < 10 and s_col2 < 10:
+                                self.log_terminal("[BOT] Match End Detected after reload! Clicking 'Return Home'...", "bot")
+                                click_relative_roi(self.hwnd, {"x": 0.505, "y": 0.850, "w": 0, "h": 0})
+                                time.sleep(2.0)
+                                continue
+                                
+                            # Check for Star Bonus popup
+                            px, py = int(0.659 * fw), int(0.120 * fh)
+                            color = f[py, px]
+                            target_color = np.array([204, 255, 255])
+                            if np.all(np.abs(color.astype(int) - target_color.astype(int)) <= 15):
+                                self.log_terminal("[BOT] Star Bonus popup detected after reload! Clicking Okay...", "bot")
+                                click_relative_roi(self.hwnd, {"x": 0.50, "y": 0.83, "w": 0, "h": 0})
+                                time.sleep(2.0)
+                                continue
+
                         time.sleep(1.0)
                     raise ReloadGameException("Game was reloaded. Restarting loop.")
                     

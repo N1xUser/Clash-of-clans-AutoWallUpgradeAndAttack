@@ -1,4 +1,6 @@
 import sys
+import os
+os.environ["QT_QPA_PLATFORM"] = "xcb"
 import tkinter as tk
 
 from src.utils.config import ROIS_FILE, CALIBRATION_ITEMS

@@ -64,6 +64,7 @@ class AttackManager:
         self._safe_capture = capture_callback
         self.get_bot_running = bot_running_callback
         self.config_getters = config_getters or {}
+        self.current_layout_style = "expanded"
     
     def get_active_targets(self):
         get_tgt = self.config_getters.get("get_target_info")
@@ -71,11 +72,13 @@ class AttackManager:
             return get_tgt()
         return "NO TARGETS CONFIGURED"
     
-    def is_auto_donate_enabled(self):
-        get_donate = self.config_getters.get("get_auto_donate")
-        if get_donate:
-            return get_donate()
-        return False
+    def is_auto_reinforce_enabled(self):
+        get_reinforce = self.config_getters.get("get_auto_reinforce")
+        return get_reinforce() if get_reinforce else False
+
+    def is_clan_donate_enabled(self):
+        get_donate = self.config_getters.get("get_clan_donate")
+        return get_donate() if get_donate else False
     
     def validate_loot(self, gold, elixir, dark):
         validator = self.config_getters.get("validate_loot")
@@ -92,7 +95,90 @@ class AttackManager:
     def detect_and_plan_attack(self, frame):
         return None
     
+    def execute_fallback_deployment(self, is_debug=False):
+        self.log_terminal("[BOT] Executing fallback deployment (no JSON/empty config)...", "bot")
+        
+        tracked_drops = []
+        last_capture_time = time.time()
+        
+        # 1. Loop through all dynamically detected cards
+        if getattr(self, "detected_cards", None):
+            self.log_terminal(f"[BOT] Fallback: Found {len(self.detected_cards)} cards visually. Auto-deploying all...", "sys")
+            for i, (cx, cy) in enumerate(self.detected_cards):
+                if not self.get_bot_running() and not is_debug:
+                    self.log_terminal("[BOT] Fallback deployment aborted by user.", "bot_off")
+                    return
+                
+                self.log_terminal(f"[BOT] Fallback: Selecting Card {i+1} at ({cx:.3f}, {cy:.3f})...", "sys")
+                
+                # Select the card slot
+                click_relative_roi(self.hwnd, {"x": cx, "y": cy, "w": 0.0, "h": 0.0})
+                time.sleep(self.ROBOT_DELAY_AFTER_SELECT)
+                
+                # Deploy 100 times along the red border lines
+                for drop_idx in range(100):
+                    if not self.get_bot_running() and not is_debug:
+                        self.log_terminal("[BOT] Fallback deployment aborted by user.", "bot_off")
+                        return
+                    
+                    dx, dy = self._get_red_line_point(random.random())
+                    click_relative_roi(self.hwnd, {"x": dx, "y": dy, "w": 0.0, "h": 0.0})
+                    time.sleep(self.ROBOT_DELAY_AFTER_DROP)
+                    
+                    # Capture occasionally to keep state updated
+                    if time.time() - last_capture_time > 1.0:
+                        try:
+                            self._safe_capture()
+                            last_capture_time = time.time()
+                        except ReloadGameException:
+                            raise
+                            
+                    if drop_idx % 10 == 0:
+                        tracked_drops.append((dx, dy, f"Card {i+1}"))
+        else:
+            self.log_terminal("[WARN] Fallback: No cards detected visually! Aborting automated deployment.", "sys")
+            return
+
+        # Save deployment visualization
+        if tracked_drops:
+            self._save_deployment_visualization([("drop", dx, dy, 0, n) for dx, dy, n in tracked_drops])
+            
+        # 2. Wait 10 seconds
+        if self.get_bot_running() or is_debug:
+            self.log_terminal("[BOT] Fallback: Waiting 10 seconds before activating hero abilities...", "sys")
+            for _ in range(10):
+                if not self.get_bot_running() and not is_debug:
+                    self.log_terminal("[BOT] Fallback deployment aborted by user.", "bot_off")
+                    return
+                time.sleep(1.0)
+                
+        # 3. Press once all the cards again to activate the heroes
+        self.log_terminal("[BOT] Fallback: Activating hero abilities...", "bot")
+        for i, (cx, cy) in enumerate(getattr(self, "detected_cards", [])):
+            if not self.get_bot_running() and not is_debug:
+                self.log_terminal("[BOT] Fallback deployment aborted by user.", "bot_off")
+                return
+            
+            self.log_terminal(f"[BOT] Fallback: Activating Card {i+1}...", "sys")
+            click_relative_roi(self.hwnd, {"x": cx, "y": cy, "w": 0.0, "h": 0.0})
+            time.sleep(self.HERO_DELAY_AFTER_ABILITY)
+            
+            if time.time() - last_capture_time > 1.0:
+                try:
+                    self._safe_capture()
+                    last_capture_time = time.time()
+                except ReloadGameException:
+                    raise
+                    
+        self.log_terminal("[BOT] Automated Fallback Sequence Stopped.", "bot")
+        self.log_terminal("[BOT] Fallback Deployment Complete! Watching battle...", "bot")
+
     def execute_deployment_plan(self, ai_data, is_debug=False):
+        if not ai_data:
+            ai_data = {}
+            
+        self.current_layout_style = ai_data.get("layout_style", "expanded")
+        
         deployment_mode = ai_data.get("deployment_mode")
         if isinstance(deployment_mode, list) and len(deployment_mode) > 0:
             deployment_mode = deployment_mode[0]
@@ -102,6 +188,32 @@ class AttackManager:
         spells_list = ai_data.get("available_spells",[])
         heroes_list = ai_data.get("available_heros",[])
         
+        # --- DYNAMIC CARD DETECTION ---
+        frame = self._safe_capture()
+        if frame is not None:
+            self.detected_cards = self._detect_card_squares(frame)
+            if self.detected_cards:
+                self.log_terminal(f"[BOT] Visually detected {len(self.detected_cards)} cards on the deployment bar.", "bot")
+            else:
+                self.log_terminal("[WARN] Failed to visually detect any cards. Falling back to static math.", "sys")
+        else:
+            self.detected_cards = []
+        # ------------------------------
+        
+        # 1. Check if fallback deployment is needed
+        if not troops_list and not spells_list and not heroes_list and not deployment:
+            self.execute_fallback_deployment(is_debug)
+            return
+            
+        # 2. Check if available troops are provided but no manual deployment_positions
+        if not deployment and (troops_list or spells_list or heroes_list):
+            self.log_terminal("[BOT] Troops/Spells/Heroes provided but no deployment positions. Auto-assigning card slots...", "sys")
+            self._assign_positions_by_order(troops_list, spells_list, heroes_list)
+            if not isinstance(deployment_mode, str) or deployment_mode.lower() not in ["human", "random", "robot"]:
+                deployment_mode = "human"
+            self.execute_advanced_deployment(deployment_mode.lower(), troops_list, spells_list, heroes_list, is_debug)
+            return
+            
         if isinstance(deployment_mode, str) and deployment_mode.lower() in ["human", "random", "robot"]:
             self.execute_advanced_deployment(deployment_mode.lower(), troops_list, spells_list, heroes_list, is_debug)
             return
@@ -130,8 +242,8 @@ class AttackManager:
                 action_queue.append(("drop", dx, dy, self.ROBOT_DELAY_AFTER_DROP, t_name))
                 tracked_drops.append((dx, dy, t_name))
         
-        if tracked_drops:
-            self._save_deployment_visualization(tracked_drops)
+        if action_queue:
+            self._save_deployment_visualization(action_queue)
             
         self.log_terminal(f"[BOT] Executing fast deployment ({len(action_queue)} actions)...", "bot")
         
@@ -163,12 +275,14 @@ class AttackManager:
         # ----------------------------------------------------
         # 1. TROOPS CALCULATION
         # ----------------------------------------------------
+        global_card_idx = 0
         if mode == "human":
             for troop in troops_list:
                 t_qty = troop.get("quantity", 15)
                 if t_qty <= 0: continue
                 t_name = troop.get("name", "Unknown")
-                t_cx, t_cy = self._get_troop_center(troop)
+                t_cx, t_cy = self._get_troop_center(troop, global_card_idx)
+                global_card_idx += 1
                 
                 # Select troop once
                 action_queue.append(("select", t_cx, t_cy, self.ROBOT_DELAY_AFTER_SELECT, t_name))
@@ -192,7 +306,7 @@ class AttackManager:
                 troop = troops_list[troop_idx]
                 t_name = troop.get("name", "Unknown")
                 t_qty = troop.get("quantity", 15)
-                t_cx, t_cy = self._get_troop_center(troop)
+                t_cx, t_cy = self._get_troop_center(troop, troop_idx)
                 
                 # Only select if it changed from the last random selection
                 if troop_idx != last_troop_idx:
@@ -232,7 +346,7 @@ class AttackManager:
                 for i, troop_idx in enumerate(interleaved_sequence):
                     troop = troops_list[troop_idx]
                     t_name = troop.get("name", "Unknown")
-                    t_cx, t_cy = self._get_troop_center(troop)
+                    t_cx, t_cy = self._get_troop_center(troop, troop_idx)
                     
                     # 🔥 Massive speed boost: only click selection card if the troop changed
                     if troop_idx != last_troop_idx:
@@ -250,33 +364,15 @@ class AttackManager:
                     tracked_drops.append((dx, dy, t_name))
 
         # ----------------------------------------------------
-        # 2. SPELLS CALCULATION
+        # 2. HEROES CALCULATION
         # ----------------------------------------------------
-        if spells_list:
-            for spell in spells_list:
-                s_name = spell.get("name", "Unknown Spell")
-                s_qty = spell.get("quantity", 1)
-                if s_qty <= 0: continue
-                s_cx, s_cy = self._get_troop_center(spell)
-                
-                action_queue.append(("select", s_cx, s_cy, self.SPELL_DELAY_AFTER_SELECT, s_name))
-                for _ in range(s_qty):
-                    dx = random.uniform(0.35, 0.65)
-                    dy = random.uniform(0.35, 0.65)
-                    action_queue.append(("drop", dx, dy, self.SPELL_DELAY_AFTER_DROP, s_name))
-                    tracked_drops.append((dx, dy, s_name))
-                    
-            # Transition wait after spells
-            action_queue.append(("wait", 0, 0, self.SPELL_DELAY_TRANSITION, "Wait for Spells"))
-
-        # ----------------------------------------------------
-        # 3. HEROES CALCULATION
-        # ----------------------------------------------------
+        global_card_idx = len(troops_list)
         hero_drops = []
         if heroes_list:
             for i, hero in enumerate(heroes_list):
                 h_name = hero.get("name", "Unknown")
-                h_cx, h_cy = self._get_troop_center(hero)
+                h_cx, h_cy = self._get_troop_center(hero, global_card_idx)
+                global_card_idx += 1
                 
                 action_queue.append(("select", h_cx, h_cy, self.HERO_DELAY_AFTER_SELECT, h_name))
                 
@@ -288,8 +384,29 @@ class AttackManager:
                 
                 power_delay = hero.get("power_delay", 7)
                 hero_drops.append((h_name, h_cx, h_cy, power_delay))
+
+        # ----------------------------------------------------
+        # 3. SPELLS CALCULATION
+        # ----------------------------------------------------
+        if spells_list:
+            for spell in spells_list:
+                s_name = spell.get("name", "Unknown Spell")
+                s_qty = spell.get("quantity", 1)
+                if s_qty <= 0: continue
+                s_cx, s_cy = self._get_troop_center(spell, global_card_idx)
+                global_card_idx += 1
                 
-            if hero_drops:
+                action_queue.append(("select", s_cx, s_cy, self.SPELL_DELAY_AFTER_SELECT, s_name))
+                for _ in range(s_qty):
+                    dx = random.uniform(0.35, 0.65)
+                    dy = random.uniform(0.35, 0.65)
+                    action_queue.append(("drop", dx, dy, self.SPELL_DELAY_AFTER_DROP, s_name))
+                    tracked_drops.append((dx, dy, s_name))
+                    
+            # Transition wait after spells
+            action_queue.append(("wait", 0, 0, self.SPELL_DELAY_TRANSITION, "Wait for Spells"))
+            
+        if hero_drops:
                 # Sort by power_delay so we wait incrementally
                 hero_drops_sorted = sorted(hero_drops, key=lambda h: h[3])
                 elapsed = 0.0
@@ -303,8 +420,8 @@ class AttackManager:
         # ----------------------------------------------------
         # 4. PRE-VISUALIZATION (Save screenshot before executing)
         # ----------------------------------------------------
-        if tracked_drops:
-            self._save_deployment_visualization(tracked_drops)
+        if action_queue:
+            self._save_deployment_visualization(action_queue)
 
         # ----------------------------------------------------
         # 5. EXECUTE ALL FAST QUEUED ACTIONS
@@ -467,7 +584,10 @@ class AttackManager:
                         x1, y1 = int(tr.get("xmin", 0) * img_w), int(tr.get("ymin", 0) * img_h)
                         x2, y2 = int(tr.get("xmax", 0) * img_w), int(tr.get("ymax", 0) * img_h)
                         cv2.rectangle(marked_img, (x1, y1), (x2, y2), (255, 255, 0), 2)
-                        cv2.putText(marked_img, tr.get("name", ""), (x1, y1 - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+                        cx = (tr.get("xmin", 0) + tr.get("xmax", 0)) / 2.0
+                        cy = (tr.get("ymin", 0) + tr.get("ymax", 0)) / 2.0
+                        text = f"{tr.get('name', '')} (X:{cx:.3f}, Y:{cy:.3f})"
+                        cv2.putText(marked_img, text, (x1, max(15, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 0), 2)
                         
                     for dep in data.get("deployment_positions",[]):
                         dx, dy = int(dep.get("x", 0) * img_w), int(dep.get("y", 0) * img_h)
@@ -523,16 +643,166 @@ class AttackManager:
             y = s4[1] + p * (s4[3] - s4[1])
         return x, y
 
-    def _get_troop_center(self, troop_info):
+    def _detect_card_squares(self, frame):
+        """Scans the bottom of the screen for the #292828 level-indicator squares."""
+        if frame is None or frame.size == 0:
+            return []
+            
+        h, w = frame.shape[:2]
+        
+        # User specified extreme deployment area bounds.
+        min_x = int(0.05 * w)
+        max_x = int(0.95 * w)
+        min_y = int(0.80 * h)
+        max_y = h
+        
+        cropped = frame[min_y:max_y, min_x:max_x]
+        
+        # 1. True Dark Gray Mask (#292828)
+        lower_gray = np.array([20, 20, 20], dtype=np.uint8)
+        upper_gray = np.array([70, 70, 70], dtype=np.uint8)
+        mask_gray_range = cv2.inRange(cropped, lower_gray, upper_gray)
+        
+        # Mathematically enforce "grayness" (R, G, B channels must be close in value)
+        # This perfectly rejects dark blue water, dark green grass, and dark brown rocks.
+        b, g, r = cv2.split(cropped)
+        max_c = np.maximum(np.maximum(b, g), r)
+        min_c = np.minimum(np.minimum(b, g), r)
+        grayness = cv2.subtract(max_c, min_c)
+        mask_true_gray = cv2.bitwise_and(mask_gray_range, cv2.inRange(grayness, 0, 15))
+        
+        # 2. Gold Max Level Box (#C19348)
+        lower_gold = np.array([30, 90, 130], dtype=np.uint8)
+        upper_gold = np.array([110, 190, 255], dtype=np.uint8)
+        mask_gold = cv2.inRange(cropped, lower_gold, upper_gold)
+        
+        mask = cv2.bitwise_or(mask_true_gray, mask_gold)
+        
+        # Slight dilation to connect the broken gray border around the white level text
+        kernel = np.ones((3,3), np.uint8)
+        mask = cv2.dilate(mask, kernel, iterations=1)
+        
+        # Save vision mask for debugging colors
+        if self.config_getters.get("get_debug_screenshots", lambda: True)():
+            try:
+                os.makedirs("response", exist_ok=True)
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                cv2.imwrite(f"response/vision_mask_debug_{ts}.png", mask)
+            except:
+                pass
+        
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        detected = []
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            # Level squares are small. Usually 15-1000 pixels.
+            if 15 < area < 1000:
+                x, y, cw, ch = cv2.boundingRect(cnt)
+                # Loose aspect ratio since the white text breaks it into a hollow rectangle
+                aspect_ratio = float(cw) / max(1, ch)
+                if 0.4 < aspect_ratio < 2.5:
+                    # Center of the level box
+                    cx_rel = (min_x + x + cw / 2.0) / w
+                    cy_rel = (min_y + y + ch / 2.0) / h
+                    
+                    # Offset RIGHT and UP from the bottom-left level box 
+                    # to hit the dead center of the card
+                    cx_rel += 0.020
+                    cy_rel -= 0.040
+                    
+                    # Ensure it's inside the deployment bar bounds
+                    if cy_rel > 0.81:
+                        detected.append((cx_rel, cy_rel))
+                    
+        # Filter duplicates that are very close to each other
+        filtered = []
+        for cx, cy in detected:
+            if not any(abs(cx - ex) < 0.02 and abs(cy - ey) < 0.02 for ex, ey in filtered):
+                filtered.append((cx, cy))
+                
+        # Sort top-to-bottom (grouping into rows), then left-to-right.
+        # We group Y into "bands" of 5% of screen height to handle slight pixel variations in the same row.
+        filtered.sort(key=lambda p: (int(p[1] * 20), p[0]))
+        return filtered
+
+    def _get_troop_center(self, troop_info, global_index=None):
+        # 1. If we have dynamically detected squares, use them sequentially!
+        if getattr(self, "detected_cards", None) and global_index is not None:
+            if global_index < len(self.detected_cards):
+                return self.detected_cards[global_index]
+                
+        # 2. If it has dynamic AI bounding box (e.g. from detect_and_plan_attack)
+        if "xmin" in troop_info and "ymin" in troop_info:
+            t_xmin = float(troop_info.get("xmin", 0))
+            t_ymin = float(troop_info.get("ymin", 0))
+            t_xmax = float(troop_info.get("xmax", 0))
+            t_ymax = float(troop_info.get("ymax", 0))
+            if t_xmin > 0 and t_ymax > 0:
+                return (t_xmin + t_xmax) / 2.0, (t_ymin + t_ymax) / 2.0
+                
+        # 3. Fallback to assigned static positions
+        if "pos" in troop_info:
+            return self._get_card_coords(troop_info["pos"])
         if "x" in troop_info and "y" in troop_info:
             return float(troop_info["x"]), float(troop_info["y"])
-        t_xmin = float(troop_info.get("xmin", 0))
-        t_ymin = float(troop_info.get("ymin", 0))
-        t_xmax = float(troop_info.get("xmax", 0))
-        t_ymax = float(troop_info.get("ymax", 0))
-        return (t_xmin + t_xmax) / 2.0, (t_ymin + t_ymax) / 2.0
+            
+        return 0.0, 0.0
+
+    def _get_card_coords(self, pos_str: str) -> tuple[float, float]:
+        try:
+            parts = pos_str.split(",")
+            row = int(parts[0].strip())
+            col = int(parts[1].strip())
+            
+            style = str(getattr(self, "current_layout_style", "expanded")).strip().lower()
+            if style == "standard":
+                y = 0.864
+                x = 0.281 + (col - 1) * 0.050
+                return x, y
+            
+            # Determine Y coordinate based on row (1 or 2)
+            if row == 1:
+                y = 0.850
+            elif row == 2:
+                y = 0.950
+            else:
+                y = 0.950
+                
+            # Determine X coordinate based on column (1-indexed)
+            if col <= 1:
+                x = 0.160
+            elif col == 2:
+                x = 0.195
+            else:
+                x = 0.195 + (col - 2) * 0.040
+                
+            return x, y
+        except Exception:
+            return 0.0, 0.0
+
+    def _assign_positions_by_order(self, troops_list, spells_list, heroes_list):
+        card_idx = 0
+        for troop in troops_list:
+            if "pos" not in troop:
+                row = 1 if card_idx < 14 else 2
+                col = (card_idx % 14) + 1
+                troop["pos"] = f"{row},{col}"
+            card_idx += 1
+        for hero in heroes_list:
+            if "pos" not in hero:
+                row = 1 if card_idx < 14 else 2
+                col = (card_idx % 14) + 1
+                hero["pos"] = f"{row},{col}"
+            card_idx += 1
+        for spell in spells_list:
+            if "pos" not in spell:
+                row = 1 if card_idx < 14 else 2
+                col = (card_idx % 14) + 1
+                spell["pos"] = f"{row},{col}"
+            card_idx += 1
     
-    def _save_deployment_visualization(self, tracked_drops):
+    def _save_deployment_visualization(self, action_queue):
         if not self.config_getters.get("get_debug_screenshots", lambda: True)():
             return
             
@@ -545,10 +815,19 @@ class AttackManager:
             debug_img = frame.copy()
             h, w = debug_img.shape[:2]
             
-            for i, (dx, dy, t_name) in enumerate(tracked_drops):
+            drop_idx = 1
+            for act_type, dx, dy, delay, label in action_queue:
+                if act_type == "wait":
+                    continue
                 px, py = int(dx * w), int(dy * h)
-                cv2.circle(debug_img, (px, py), 6, (0, 0, 255), -1)
-                cv2.putText(debug_img, str(i+1), (px + 8, py + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                
+                if act_type == "select":
+                    cv2.circle(debug_img, (px, py), 15, (255, 0, 0), 2)
+                    cv2.putText(debug_img, f"SEL: {label}", (px - 20, py - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
+                elif act_type == "drop":
+                    cv2.circle(debug_img, (px, py), 6, (0, 0, 255), -1)
+                    cv2.putText(debug_img, str(drop_idx), (px + 8, py + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                    drop_idx += 1
                 
             os.makedirs("response", exist_ok=True)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")

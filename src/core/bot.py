@@ -1,5 +1,6 @@
 # --- START OF FILE bot.py ---
 
+
 import time
 import threading
 import datetime
@@ -7,8 +8,9 @@ import json
 import cv2
 import numpy as np
 
-from src.vision.capture import capture_frame, click_relative_roi, scroll_roi, zoom_camera, pan_camera
+from src.vision.capture import capture_frame, click_relative_roi, scroll_roi, zoom_camera, pan_camera, send_esc_key
 from src.vision.detection import crop_roi, is_main_screen, check_match_found
+from src.core.recovery import attempt_recovery
 from src.utils.config import STATIC_ATTACK_FILE
 
 
@@ -73,8 +75,9 @@ class BotOrchestrator:
                 
                 target_bgr = np.array([30, 28, 25])
                 if np.all(np.abs(color1 - target_bgr) <= 15) and np.all(np.abs(color2 - target_bgr) <= 15):
-                    self.ui_callbacks["log_terminal"]("[WARN] Reload Game popup detected! Clicking Reload...", "sys")
-                    click_relative_roi(self.hwnd, {"x": 0.320, "y": 0.566, "w": 0, "h": 0})
+                    self.ui_callbacks["log_terminal"]("[WARN] Reload Game popup detected! Pressing ESC...", "sys")
+                    time.sleep(1.0)
+                    send_esc_key(self.hwnd)
                     time.sleep(5.0)
                     
                     while self.bot_running:
@@ -177,6 +180,7 @@ class BotOrchestrator:
         
     def _pipeline_worker(self):
         attack_count = 0
+        consecutive_failures = 0
         while self.bot_running:
             try:
                 self.ui_callbacks["log_terminal"]("[BOT] Step 1: Retrieving Home Resources...", "bot")
@@ -188,41 +192,24 @@ class BotOrchestrator:
                 already_in_battle = False
                 check_frame = self._safe_capture()
                 if check_frame is not None and not is_main_screen(check_frame, self.rois['main_screen_i']):
-                    h, w = check_frame.shape[:2]
-                    px, py = int(0.880 * w), int(0.762 * h)
-                    px, py = min(px, w - 1), min(py, h - 1)
-                    color = check_frame[py, px]
+                    result = attempt_recovery(
+                        self.hwnd, self.rois,
+                        self._safe_capture,
+                        self.ui_callbacks['log_terminal']
+                    )
                     
-                    if np.all(color >= 240):
-                        self.ui_callbacks['log_terminal']('[BOT] Battle screen detected! Resuming attack...', 'bot')
+                    if result == "battle":
                         already_in_battle = True
-                    else:
-                        h, w = check_frame.shape[:2]
-                        s1_x, s1_y = int(0.870 * w), int(0.445 * h)
-                        s2_x, s2_y = int(0.170 * w), int(0.540 * h)
-                        crop1 = check_frame[max(0, s1_y-2):s1_y+3, max(0, s1_x-2):s1_x+3]
-                        crop2 = check_frame[max(0, s2_y-2):s2_y+3, max(0, s2_x-2):s2_x+3]
-                        s_col1 = np.mean(crop1) if crop1.size > 0 else 255
-                        s_col2 = np.mean(crop2) if crop2.size > 0 else 255
-                        
-                        if s_col1 < 20 and s_col2 < 20:
-                            self.ui_callbacks['log_terminal']('[BOT] Match End screen detected! Clicking Return Home...', 'bot')
-                            click_relative_roi(self.hwnd, {'x': 0.505, 'y': 0.850, 'w': 0, 'h': 0})
-                            time.sleep(3.0)
-                        else:
-                            self.ui_callbacks['log_terminal']('[WARN] Not on main screen. Attempting recovery...', 'sys')
-                            click_relative_roi(self.hwnd, {'x': 0.505, 'y': 0.850, 'w': 0, 'h': 0}) 
-                            time.sleep(1.0)
-                            click_relative_roi(self.hwnd, {'x': 0.95, 'y': 0.05, 'w': 0, 'h': 0}) 
-                            time.sleep(1.0)
-                            click_relative_roi(self.hwnd, {'x': 0.95, 'y': 0.05, 'w': 0, 'h': 0})
-                            time.sleep(1.5)
+                    elif result == "failed":
+                        consecutive_failures += 1
+                        if consecutive_failures >= 2:
+                            self.ui_callbacks['log_terminal']('[WARN] Recovery failed 2 times. Sending ESC key...', 'sys')
+                            send_esc_key(self.hwnd)
+                            consecutive_failures = 0
+                        time.sleep(2.0)
+                        continue
                             
-                        recheck = self._safe_capture()
-                        if recheck is None or not is_main_screen(recheck, self.rois['main_screen_i']):
-                            self.ui_callbacks['log_terminal']('[WARN] Still not on main screen. Restarting cycle...', 'sys')
-                            time.sleep(2.0)
-                            continue
+                consecutive_failures = 0
 
                 if not already_in_battle:
                     time.sleep(1.0)
@@ -230,23 +217,26 @@ class BotOrchestrator:
                     current_time = time.time()
                     last_scan = self.state_manager.get_last_upgrades_scan_time()
 
-                    if current_time - last_scan > 1800 or not self.state_manager.has_upgrades_cache():
-                        self.ui_callbacks["log_terminal"]("[BOT] Step 2: Upgrades info older than 30m. Updating...", "bot")
-
-                        self.ui_callbacks["scan_upgrades"](is_bot=True)
-
-                        if self.bot_running:
-                            new_upg = self.state_manager.get_latest_upgrades()
-                            if new_upg.get("total_items_found", 0) > 0:
-                                self.state_manager.update_upgrades_cache(new_upg)
-                                self.ui_callbacks["log_terminal"]("[BOT] Upgrades cache updated successfully.", "bot")
-                            else:
-                                self.ui_callbacks["log_terminal"]("[WARN] Upgrades scan found 0 items! Keeping previous cache to be safe.", "sys")
-                                self.state_manager.restore_upgrades_from_cache()
+                    if self.upgrade_manager.is_auto_wall_enabled():
+                        if current_time - last_scan > 1800 or not self.state_manager.has_upgrades_cache():
+                            self.ui_callbacks["log_terminal"]("[BOT] Step 2: Upgrades info older than 30m. Updating...", "bot")
+    
+                            self.ui_callbacks["scan_upgrades"](is_bot=True)
+    
+                            if self.bot_running:
+                                new_upg = self.state_manager.get_latest_upgrades()
+                                if new_upg.get("total_items_found", 0) > 0:
+                                    self.state_manager.update_upgrades_cache(new_upg)
+                                    self.ui_callbacks["log_terminal"]("[BOT] Upgrades cache updated successfully.", "bot")
+                                else:
+                                    self.ui_callbacks["log_terminal"]("[WARN] Upgrades scan found 0 items! Keeping previous cache to be safe.", "sys")
+                                    self.state_manager.restore_upgrades_from_cache()
+                        else:
+                            self.ui_callbacks["log_terminal"]("[BOT] Step 2: Upgrades info is recent (< 30m). Loading from cache.", "bot")
+                            self.state_manager.load_upgrades_from_cache()
+                            self.ui_callbacks["trigger_cache_update"]()
                     else:
-                        self.ui_callbacks["log_terminal"]("[BOT] Step 2: Upgrades info is recent (< 30m). Loading from cache.", "bot")
-                        self.state_manager.load_upgrades_from_cache()
-                        self.ui_callbacks["trigger_cache_update"]()
+                        self.ui_callbacks["log_terminal"]("[BOT] Step 2: Auto-Walls DISABLED. Skipping Upgrades scan.", "bot")
 
                     if not self.bot_running:
                         break
@@ -272,8 +262,8 @@ class BotOrchestrator:
                     if not self.bot_running:
                         break
 
-                    if self.attack_manager.is_auto_donate_enabled():
-                        self.ui_callbacks["log_terminal"]("[BOT] Auto-Donate ENABLED. Buying with medals...", "bot")
+                    if self.attack_manager.is_auto_reinforce_enabled():
+                        self.ui_callbacks["log_terminal"]("[BOT] Auto-Reinforce ENABLED. Buying with medals...", "bot")
                         time.sleep(0.3)
                         click_relative_roi(self.hwnd, {"x": 0.802, "y": 0.774, "w": 0.0, "h": 0.0})
                         time.sleep(0.3)
@@ -281,16 +271,24 @@ class BotOrchestrator:
                         time.sleep(0.3)
                         click_relative_roi(self.hwnd, {"x": 0.850, "y": 0.850, "w": 0.0, "h": 0.0})
                     else:
-                        self.ui_callbacks["log_terminal"]("[BOT] Auto-Donate DISABLED. Only attacking...", "bot")
+                        self.ui_callbacks["log_terminal"]("[BOT] Auto-Reinforce DISABLED. Only attacking...", "bot")
                         click_relative_roi(self.hwnd, {"x": 0.85, "y": 0.85, "w": 0.0, "h": 0.0})
 
                     time.sleep(2.0)
 
                     self.ui_callbacks["log_terminal"]("[BOT] Searching for match...", "bot")
-                    next_btn_roi = {"x": 0.80, "y": 0.75, "w": 0.15, "h": 0.15}
+                    next_btn_roi = {"x": 0.870, "y": 0.743, "w": 0.10, "h": 0.06}
                     restart_cycle = False
+                    search_start_time = time.time()
 
                     while self.bot_running:
+                        if time.time() - search_start_time > 60.0:
+                            self.ui_callbacks["log_terminal"]("[WARN] Search timed out (60s). Clicking return home...", "sys")
+                            click_relative_roi(self.hwnd, {"x": 0.058, "y": 0.892, "w": 0.0, "h": 0.0})
+                            time.sleep(2.0)
+                            restart_cycle = True
+                            break
+
                         frame = self._safe_capture()
 
                         if frame is not None and is_main_screen(frame, self.rois["main_screen_i"]):
@@ -339,6 +337,7 @@ class BotOrchestrator:
                                 self.ui_callbacks["log_terminal"](f"[BOT] Loot insufficient[G:{enemy_gold} E:{enemy_elx} D:{enemy_dark}]. Clicking Next...", "bot")
                                 click_relative_roi(self.hwnd, next_btn_roi)
                                 time.sleep(3.5)
+                                search_start_time = time.time()
                         else:
                             time.sleep(0.5)
 
@@ -355,24 +354,47 @@ class BotOrchestrator:
                         frame = self._safe_capture()
                         if frame is not None:
                             ai_data = self.attack_manager.detect_and_plan_attack(frame)
-                            if ai_data and (ai_data.get("deployment_positions") or (isinstance(ai_data.get("deployment_mode"), str) and ai_data.get("deployment_mode").lower() in ["human", "random", "robot"])):
-                                self.attack_manager.execute_deployment_plan(ai_data, False)
-                            else:
-                                self.ui_callbacks["log_terminal"]("[AI] No data returned from DYNAMIC AI or API error.", "sys")
+                            if not ai_data:
+                                ai_data = {}
+                            self.attack_manager.execute_deployment_plan(ai_data, False)
                         else:
-                            self.ui_callbacks["log_terminal"]("[ERROR] Failed to capture frame for DYNAMIC AI.", "sys")
+                            self.ui_callbacks["log_terminal"]("[ERROR] Failed to capture frame for DYNAMIC AI. Executing fallback...", "sys")
+                            self.attack_manager.execute_deployment_plan({}, False)
                             
                     elif ai_mode == "STATIC":
                         self.ui_callbacks["log_terminal"]("[AI] Static AI Mode. Loading config/static_attack.json...", "sys")
+                        ai_data = {}
                         try:
                             with open(STATIC_ATTACK_FILE, "r") as f:
                                 ai_data = json.load(f)
-                                if ai_data and (ai_data.get("deployment_positions") or (isinstance(ai_data.get("deployment_mode"), str) and ai_data.get("deployment_mode").lower() in ["human", "random", "robot"])):
-                                    self.attack_manager.execute_deployment_plan(ai_data, False)
-                                else:
-                                    self.ui_callbacks["log_terminal"]("[AI] Missing deployment_positions or mode in config/static_attack.json.", "sys")
                         except Exception as e:
-                            self.ui_callbacks["log_terminal"](f"[ERROR] Failed to load config/static_attack.json: {e}", "sys")
+                            self.ui_callbacks["log_terminal"](f"[WARN] Failed to load/parse config/static_attack.json: {e}. Defaulting to fallback.", "sys")
+                            
+                        # Automatically detect coordinates using vision
+                        self.ui_callbacks["log_terminal"]("[BOT] Automatically mapping deployment bar...", "bot")
+                        frame = self._safe_capture()
+                        if frame is not None:
+                            detected_data = self.attack_manager.detect_and_plan_attack(frame)
+                            if detected_data and "available_troops" in detected_data:
+                                detected_troops = detected_data["available_troops"]
+                                
+                                # Map detected coordinates to our static troops
+                                for category in ["available_troops", "available_spells", "available_heros"]:
+                                    for static_troop in ai_data.get(category, []):
+                                        t_name = static_troop.get("name", "").lower()
+                                        for dt in detected_troops:
+                                            if dt.get("name", "").lower() == t_name:
+                                                static_troop["xmin"] = dt.get("xmin")
+                                                static_troop["ymin"] = dt.get("ymin")
+                                                static_troop["xmax"] = dt.get("xmax")
+                                                static_troop["ymax"] = dt.get("ymax")
+                                                # Remove pos/x/y so it strictly uses the detected bounding box
+                                                static_troop.pop("pos", None)
+                                                static_troop.pop("x", None)
+                                                static_troop.pop("y", None)
+                                                break
+                        
+                        self.attack_manager.execute_deployment_plan(ai_data, False)
                             
                     self._monitor_battle_end()
                     
@@ -381,7 +403,19 @@ class BotOrchestrator:
 
                     attack_count += 1
 
-                    if self.upgrade_manager.is_auto_wall_enabled():
+                    # Auto-Donation check BEFORE walls
+                    if self.bot_running and self.attack_manager.is_clan_donate_enabled():
+                        self.ui_callbacks["log_terminal"]("[BOT] Checking for donation requests...", "bot")
+                        from src.core.donation import run_donation_cycle
+                        save_ss = self.attack_manager.config_getters.get("get_debug_screenshots", lambda: True)()
+                        run_donation_cycle(
+                            self.hwnd,
+                            self._safe_capture,
+                            self.ui_callbacks["log_terminal"],
+                            save_screenshots=save_ss
+                        )
+
+                    if self.bot_running and self.upgrade_manager.is_auto_wall_enabled():
                         wall_freq = self.ui_callbacks.get("get_wall_check_freq", lambda: 1)()
                         if attack_count % wall_freq == 0:
                             self.ui_callbacks["log_terminal"](f"[BOT] Post-Match ({attack_count}/{wall_freq}): Evaluating Wall Upgrades...", "bot")

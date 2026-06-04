@@ -281,7 +281,7 @@ if sys.platform == 'win32':
                 win32gui.PostMessage(target, win32con.WM_MOUSEWHEEL, wparam, lparam_screen)
             time.sleep(0.05)
 
-    def pan_camera(hwnd: int | str, start_rel: tuple, end_rel: tuple, drag_speed=10):
+    def pan_camera(hwnd: int | str, start_rel: tuple, end_rel: tuple, drag_speed=25, stop_inertia=False):
         cx, cy, cw, ch = get_client_rect(hwnd)
         ch_capture = max(ch - HEADER_OFFSET_PX, 1)
         
@@ -301,25 +301,38 @@ if sys.platform == 'win32':
 
         for target in targets:
             client_pos_start = win32gui.ScreenToClient(target, (cx + start_x, cy + start_y))
-            lparam_start = ((client_pos_start[1] & 0xFFFF) << 16) | (client_pos_start[0] & 0xFFFF)
+            lparam_start = win32api.MAKELONG(client_pos_start[0], client_pos_start[1])
             win32gui.PostMessage(target, win32con.WM_MOUSEMOVE, 0, lparam_start)
             win32gui.PostMessage(target, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, lparam_start)
-        time.sleep(0.05)
+        time.sleep(0.1)
 
         for i in range(1, drag_speed + 1):
             cur_x = int(start_x + (end_x - start_x) * (i / drag_speed))
             cur_y = int(start_y + (end_y - start_y) * (i / drag_speed))
             for target in targets:
                 client_pos_move = win32gui.ScreenToClient(target, (cx + cur_x, cy + cur_y))
-                lparam_move = ((client_pos_move[1] & 0xFFFF) << 16) | (client_pos_move[0] & 0xFFFF)
+                lparam_move = win32api.MAKELONG(client_pos_move[0], client_pos_move[1])
                 win32gui.PostMessage(target, win32con.WM_MOUSEMOVE, win32con.MK_LBUTTON, lparam_move)
-            time.sleep(0.01)
+            time.sleep(0.02)
+
+        if stop_inertia:
+            time.sleep(0.3)  # Wait with mouse down to ensure zero velocity before releasing
 
         for target in targets:
             client_pos_end = win32gui.ScreenToClient(target, (cx + end_x, cy + end_y))
-            lparam_end = ((client_pos_end[1] & 0xFFFF) << 16) | (client_pos_end[0] & 0xFFFF)
+            lparam_end = win32api.MAKELONG(client_pos_end[0], client_pos_end[1])
             win32gui.PostMessage(target, win32con.WM_LBUTTONUP, 0, lparam_end)
-        time.sleep(0.1)
+        time.sleep(0.2)
+
+    def send_esc_key(hwnd: int | str):
+        """Send a physical-style ESC keystroke to the window."""
+        VK_ESCAPE = 0x1B
+        SCAN_ESC = 0x01
+        lparam_down = (1) | (SCAN_ESC << 16)
+        lparam_up = (1) | (SCAN_ESC << 16) | (0xC0 << 24)
+        win32gui.PostMessage(hwnd, win32con.WM_KEYDOWN, VK_ESCAPE, lparam_down)
+        time.sleep(0.05)
+        win32gui.PostMessage(hwnd, win32con.WM_KEYUP, VK_ESCAPE, lparam_up)
 
 else:
     import subprocess
@@ -441,3 +454,7 @@ else:
         duration = max(200, drag_speed * 50)
         _run_adb(f"shell input swipe {start_x} {start_y} {end_x} {end_y} {duration}")
         time.sleep(0.2)
+
+    def send_esc_key(hwnd: int | str):
+        """Send ESC key via ADB."""
+        _run_adb("shell input keyevent 111")  # KEYCODE_ESCAPE

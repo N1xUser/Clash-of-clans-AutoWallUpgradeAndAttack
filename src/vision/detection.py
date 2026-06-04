@@ -100,6 +100,19 @@ def point_in_rect(px: int, py: int, rect: tuple) -> bool:
     return rect[0] <= px <= rect[2] and rect[1] <= py <= rect[3]
 
 def is_main_screen(frame: np.ndarray, i_roi: dict) -> bool:
+    if frame is None or frame.size == 0:
+        return False
+        
+    # Verify color #0D0D0D (BGR: 13, 13, 13) at coords x=0.351, y=0.035 (with tolerance of 20)
+    h, w = frame.shape[:2]
+    px, py = int(0.351 * w), int(0.035 * h)
+    px, py = min(px, w - 1), min(py, h - 1)
+    color = frame[py, px]
+    if not (abs(int(color[0]) - 13) <= 20 and 
+            abs(int(color[1]) - 13) <= 20 and 
+            abs(int(color[2]) - 13) <= 20):
+        return False
+
     roi_img = crop_roi(frame, i_roi)
     if roi_img is None or roi_img.size == 0:
         return False
@@ -122,6 +135,10 @@ def check_match_found(frame: np.ndarray, next_button_roi: dict) -> bool:
     if frame is None or frame.size == 0:
         return False
         
+    # Robustly check if the attack screen is visible first
+    if is_battle_screen(frame):
+        return True
+        
     roi_img = crop_roi(frame, next_button_roi)
     if roi_img.size == 0:
         return False
@@ -134,3 +151,34 @@ def check_match_found(frame: np.ndarray, next_button_roi: dict) -> bool:
     white_pixels = cv2.countNonZero(mask)
     
     return white_pixels > 50
+
+def is_battle_screen(frame: np.ndarray) -> bool:
+    if frame is None or frame.size == 0:
+        return False
+    h, w = frame.shape[:2]
+    
+    # Position 1: X: 0.028, Y: 0.232 (Dark Elixir droplet icon)
+    px1, py1 = int(0.028 * w), int(0.232 * h)
+    
+    # Position 2: X: 0.029, Y: 0.185 (Elixir droplet icon)
+    px2, py2 = int(0.029 * w), int(0.185 * h)
+    
+    tol = 30
+    
+    # Check Dark Elixir (Hex #241F22 -> BGR: 34, 31, 36)
+    y1_start, y1_end = max(0, py1 - 5), min(h, py1 + 5)
+    x1_start, x1_end = max(0, px1 - 5), min(w, px1 + 5)
+    roi1 = frame[y1_start:y1_end, x1_start:x1_end]
+    lower1 = np.array([max(0, 34-tol), max(0, 31-tol), max(0, 36-tol)])
+    upper1 = np.array([min(255, 34+tol), min(255, 31+tol), min(255, 36+tol)])
+    mask1 = cv2.inRange(roi1, lower1, upper1)
+    
+    # Check Elixir (Hex #8412A5 -> BGR: 165, 18, 132)
+    y2_start, y2_end = max(0, py2 - 5), min(h, py2 + 5)
+    x2_start, x2_end = max(0, px2 - 5), min(w, px2 + 5)
+    roi2 = frame[y2_start:y2_end, x2_start:x2_end]
+    lower2 = np.array([max(0, 165-tol), max(0, 18-tol), max(0, 132-tol)])
+    upper2 = np.array([min(255, 165+tol), min(255, 18+tol), min(255, 132+tol)])
+    mask2 = cv2.inRange(roi2, lower2, upper2)
+              
+    return cv2.countNonZero(mask1) > 0 and cv2.countNonZero(mask2) > 0

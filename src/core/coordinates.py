@@ -3,7 +3,7 @@ class AttackCoordinates:
     
     FIND_MATCH_BUTTON = {"x": 0.14, "y": 0.70, "w": 0.15, "h": 0.06}
     
-    NEXT_BUTTON = {"x": 0.80, "y": 0.75, "w": 0.15, "h": 0.15}
+    NEXT_BUTTON = {"x": 0.870, "y": 0.743, "w": 0.10, "h": 0.06}
     
     RETURN_HOME_BUTTON = {"x": 0.505, "y": 0.850, "w": 0, "h": 0}
     
